@@ -1,0 +1,2 @@
+# NotSoNico
+Für Claude Code.
