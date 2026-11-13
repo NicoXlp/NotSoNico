@@ -1380,7 +1380,7 @@ const NEWS = [
     date: '2026-11-13',
     label: '✨ Neue Funktionen',
     items: [
-      { icon: '📱', title: 'Galaxy Fold & Flip', text: 'Außendisplay, aufgeklappt oder quer – die App passt sich jetzt jedem Bildschirm an.' },
+      { icon: '📱', title: 'iPhone Fold, Galaxy Fold & Flip', text: 'Außendisplay, aufgeklappt oder quer – die App passt sich jetzt jedem Bildschirm an.' },
       { icon: '🪟', title: 'Aufgeklappt mehr sehen', text: 'Auf großen Faltbildschirmen zeigt die Startseite zwei Spalten nebeneinander.' },
       { icon: '↔️', title: 'Zwei Bildschirme', text: 'Auf Geräten mit Scharnier (z. B. Surface Duo) bleibt links die App, rechts öffnen sich Chats – nichts verschwindet im Knick.' },
     ],

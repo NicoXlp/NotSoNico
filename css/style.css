@@ -1492,3 +1492,9 @@ html.sheet-open, html.sheet-open body { overflow: hidden; overscroll-behavior: n
 }
 .banner-txt { flex: 1; }
 @media (max-width: 340px) { .banner .banner-txt { flex: 1 1 calc(100% - 40px); } }
+
+/* Aufgeklapptes iPhone Fold (4:3, ca. 640 px breit): Startseite ebenfalls zweispaltig */
+@media (min-width: 620px) and (min-height: 560px) {
+  .view { max-width: 980px; }
+  .home-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 0 18px; align-items: start; }
+}
