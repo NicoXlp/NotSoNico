@@ -1340,3 +1340,8 @@ img.blur { filter: blur(14px) saturate(1.2); transform: scale(1.08); }
 .dm-bubble.media .mgrid.n1 .mtile { max-height: 340px; }
 
 .nick-field input { font-weight: 600; }
+/* Hervorhebung folgt der Form der Blase (bei Sprachnachrichten: der Tonspur-Pille) */
+.dm-msg.flash .dm-bubble.bare:not(.has-quote), .dm-msg.sel .dm-bubble.bare:not(.has-quote) { animation: none; box-shadow: none; }
+.dm-msg.flash .dm-bubble.bare:not(.has-quote) .voice { animation: dmFlash 1.5s ease; }
+.dm-msg.sel .dm-bubble.bare:not(.has-quote) .voice { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent); }
+.dm-bubble.media .mgrid { border-radius: 14px; }
