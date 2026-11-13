@@ -154,7 +154,7 @@ a { color: var(--accent); }
 .sp-line.short { width: 60%; }
 .sp-back .sp-line { width: 70%; }
 .sp-house { width: 56px; height: 56px; color: #5a6be0; }
-.sp-ribbon { position: absolute; left: -7px; bottom: -26px; width: 14px; height: 34px; background: #ff8a7a; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%); transform-origin: top; animation: spRibbon .6s 2.9s ease-out both; }
+.sp-ribbon { position: absolute; left: calc(50% - 7px); top: calc(var(--h) - 8px); width: 14px; height: 34px; background: #ff8a7a; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%); transform-origin: top; transform: translateZ(8px); animation: spRibbon .6s 2.9s ease-out both; }
 
 /* Einband */
 .sp-cover .sp-front {
@@ -175,7 +175,7 @@ a { color: var(--accent); }
 @keyframes spIn { from { opacity: 0; transform: translateY(18px) scale(.82); } }
 @keyframes spShift { from { transform: translateX(calc(var(--w) * -.5)) rotateX(14deg) rotateZ(-4deg); } to { transform: translateX(0) rotateX(14deg); } }
 @keyframes spFlip { to { transform: rotateY(var(--end)) translateZ(0); } }
-@keyframes spRibbon { from { transform: scaleY(0); } }
+@keyframes spRibbon { from { transform: translateZ(8px) scaleY(0); } }
 @keyframes spText { from { opacity: 0; transform: translateY(8px); } }
 
 @media (prefers-reduced-motion: reduce) {
