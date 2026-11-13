@@ -1,7 +1,7 @@
 {
   "name": "Vermietertagebuch",
   "short_name": "Vermietertagebuch",
-  "description": "Aufgaben, Müllabfuhr, Pinnwand, Umfragen und Ereignisse für eure Hausgemeinschaft.",
+  "description": "Aufgaben, Müllabfuhr, Social Hub, Umfragen und Ereignisse für eure Hausgemeinschaft.",
   "lang": "de",
   "start_url": "./",
   "scope": "./",

@@ -1,4 +1,4 @@
-// Fotos & Videos für die Pinnwand.
+// Fotos & Videos für den Social Hub.
 //
 // Fotos werden im Browser verkleinert (max. 1600 px, JPEG). Dateien werden in Stücke
 // (< 1 MB, Firestore-Grenze) zerlegt und in der Sammlung „chunks“ gespeichert. So reicht

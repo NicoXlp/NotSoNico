@@ -6,7 +6,7 @@ Die Web-App für eure Hausgemeinschaft – im **Liquid-Glass-Design**, für iPho
 - 🗑️ **Müllabfuhr** – Abholplan mit Kalender, „Wer ist dran?“-Rotation, **Bestätigungsfeld „Rausgestellt von …“** für alle sichtbar
 - 📅 **Abfallkalender hochladen** – jede:r kann den .ics-Kalender der Stadt hochladen und festlegen, für wen er gilt (ganzes Haus, nur ich, bestimmte Personen)
 - 🔔 **Push-Erinnerungen** – z. B. am Vorabend um 18 Uhr: „Gelber Sack rausstellen – du bist dran!“, mit Nachfassen, falls noch niemand bestätigt hat, und Button „✓ Rausgestellt“ direkt in der Mitteilung
-- 📌 **Pinnwand** – Beiträge mit **Fotos & Videos**, **@Markierungen**, **Sprachnachrichten**, Umfragen und Ereignisse mit Zu-/Absage; Likes, Emoji-Reaktionen und Kommentare
+- 📌 **Social Hub** – Beiträge mit **Fotos & Videos**, **@Markierungen**, **Sprachnachrichten**, Umfragen und Ereignisse mit Zu-/Absage; Likes, Emoji-Reaktionen und Kommentare
 - 🌗 Hell/Dunkel, offline-fähig, installierbar als App (PWA)
 
 ---
