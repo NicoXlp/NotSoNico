@@ -8,7 +8,7 @@
 //   getHouse()/setHouse(obj)
 
 const FB = 'https://www.gstatic.com/firebasejs/10.12.2/';
-export const COLLECTIONS = ['members', 'tasks', 'feed', 'trash'];
+export const COLLECTIONS = ['members', 'tasks', 'feed', 'trash', 'feedback'];
 // Werden nicht live abonniert: Sprachnachrichten (groß) und Push-Abos
 export const SIDE_COLLECTIONS = ['audio', 'subs'];
 

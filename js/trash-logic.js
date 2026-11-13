@@ -69,6 +69,7 @@ export const EVENT_TYPES = [
   ['social', '❤️ Likes, Kommentare & Reaktionen auf meine Beiträge'],
   ['bin_done', '🗑️ Tonne wurde rausgestellt'],
   ['mention', '🏷️ Wenn mich jemand markiert'],
+  ['feedback', '💡 Neue Wünsche & Bug-Meldungen'],
 ];
 
 /** Welche Neuigkeiten gehen an dieses Mitglied? (nicht an die auslösende Person, nur an Empfänger, abgeschaltete Arten weg) */
