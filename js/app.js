@@ -423,40 +423,60 @@ function settleViewport() {
     requestAnimationFrame(() => { st.minHeight = ''; window.scrollTo(0, y); });
   }, 80);
 }
-/* iPhone/iPad als Home-Bildschirm-App: Safari lässt den Bereich der App nach der Tastatur oft
-   um die Höhe der Eingabeleiste verkleinert – Navigationsleiste und Fenster sitzen dann zu hoch,
-   bis man zieht. Wir messen die Lücke und gleichen sie sofort aus (--ios-gap). */
-const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-const iosApp = () => navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
-let iosBase = null, iosOrient = null;
-function fullHeight() {
-  const a = screen.width, b = screen.height;
-  return matchMedia('(orientation: portrait)').matches ? Math.max(a, b) : Math.min(a, b);
-}
+/* Auf allen Geräten: Manche Browser (v. a. Safari auf iPhone/iPad, teils auch Android-Browser)
+   lassen den Bereich der App nach dem Schließen der Tastatur verkleinert – Navigationsleiste und
+   Fenster sitzen dann zu hoch, bis man zieht. Wir merken uns die Höhe vor dem Tippen und gleichen
+   eine danach fehlende Höhe sofort aus (--ios-gap). Ohne Tastatur passiert nichts – so stören
+   ein- und ausblendende Adressleisten im Browser nicht. */
+const isTextField = (el) => !!el?.matches?.('input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]), textarea, [contenteditable="true"]');
+let kbBaseH = null;      // Höhe vor dem Öffnen der Tastatur
+let kbArmed = false;     // Tastatur war offen → auf zurückbleibende Lücke achten
+let kbDisarm = 0, kbClosedAt = 0;
+function setGap(px) { document.documentElement.style.setProperty('--ios-gap', px > 2 && px < 200 ? `${Math.round(px)}px` : '0px'); }
 function fixIosGap() {
-  if (!IS_IOS || !iosApp()) return;
-  const orient = matchMedia('(orientation: portrait)').matches ? 'p' : 'l';
-  const gap = Math.round(fullHeight() - window.innerHeight);
-  // Grundwert merken, solange nicht getippt wird (manche Geräte haben von Haus aus eine kleine Differenz)
-  if (iosBase === null || iosOrient !== orient) { if (!typing()) { iosBase = gap; iosOrient = orient; } else return; }
-  if (!typing() && gap < iosBase) iosBase = gap;
-  const extra = typing() ? 0 : Math.max(0, gap - iosBase);
-  document.documentElement.style.setProperty('--ios-gap', extra > 2 && extra < 160 ? `${extra}px` : '0px');
+  if (typing() || !kbArmed || kbBaseH == null) { if (!typing()) setGap(0); return; }
+  const gap = kbBaseH - window.innerHeight;
+  clearTimeout(kbDisarm);
+  if (gap <= 2) {
+    setGap(0);
+    // Volle Höhe ist zurück → Browser hat sich erholt (kurz nach dem Schließen noch abwarten)
+    if (Date.now() - kbClosedAt > 400) kbArmed = false;
+    else kbDisarm = setTimeout(fixIosGap, 450);
+    return;
+  }
+  setGap(gap);
 }
 function nudgeViewport() {
-  // Viewport-Angabe kurz neu setzen: zwingt Safari, die Höhe neu zu berechnen
+  // Viewport-Angabe kurz neu setzen: bringt Safari dazu, die Höhe neu zu berechnen
   const vp = document.querySelector('meta[name=viewport]');
-  if (!vp || !IS_IOS) return;
+  if (!vp) return;
   const c = vp.getAttribute('content');
   vp.setAttribute('content', c + ', maximum-scale=1');
   requestAnimationFrame(() => { vp.setAttribute('content', c); fixIosGap(); });
 }
+document.addEventListener('focusin', (e) => {
+  if (!isTextField(e.target)) return;
+  if (!kbArmed) kbBaseH = window.innerHeight; // Höhe ohne Tastatur merken
+  setGap(0);
+});
 window.addEventListener('resize', fixIosGap);
 window.visualViewport?.addEventListener('resize', () => setTimeout(fixIosGap, 50));
-window.addEventListener('orientationchange', () => { iosBase = null; setTimeout(fixIosGap, 400); });
+let lastAngle = screen.orientation?.angle ?? window.orientation ?? 0;
+window.addEventListener('orientationchange', () => {
+  // Nur echtes Drehen des Geräts zählt (nicht das Verkleinern durch die Tastatur)
+  const angle = screen.orientation?.angle ?? window.orientation ?? 0;
+  if (angle === lastAngle || typing()) return;
+  lastAngle = angle; kbArmed = false; kbBaseH = null; setGap(0);
+});
 document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(fixIosGap, 300); });
-fixIosGap();
-document.addEventListener('focusout', () => { settleViewport(); setTimeout(() => { if (!typing()) { nudgeViewport(); fixIosGap(); } }, 120); setTimeout(fixIosGap, 500); });
+document.addEventListener('focusout', (e) => {
+  settleViewport();
+  if (!isTextField(e.target) || kbBaseH == null) return;
+  kbArmed = true; kbClosedAt = Date.now();
+  setTimeout(() => { if (!typing()) { nudgeViewport(); fixIosGap(); } }, 120);
+  setTimeout(fixIosGap, 500);
+  setTimeout(fixIosGap, 1200);
+});
 window.visualViewport?.addEventListener('resize', () => { if (!typing()) settleViewport(); });
 // Während ein Fenster offen ist, darf die Seite dahinter nicht wegrutschen (iOS verschiebt sie beim Tippen)
 window.addEventListener('scroll', () => { if (scrollLocked && !typing() && Math.abs(window.scrollY - lockY) > 1) settleViewport(); }, { passive: true });
