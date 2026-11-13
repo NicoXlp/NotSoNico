@@ -3116,14 +3116,21 @@ const randomMember = () => {
 function memberSheet(id, { asMe = false } = {}) {
   const m = id ? member(id) : null;
   const v = m ? { ...m } : randomMember();
+  const other = !!m && m.id !== state.me; // fremde Profile: nur ansehen (nicht bearbeiten)
   openSheet({
     title: m ? (m.id === state.me ? 'Mein Profil' : dn(m.id)) : asMe ? 'Wer bist du?' : 'Mitglied hinzufügen',
-    html: `${m && m.id !== state.me ? `<div class="row" style="gap:8px;margin-bottom:14px"><button type="button" class="btn block primary" id="m-dm">${I.dm}Nachricht</button><button type="button" class="btn block" id="m-task">${I.tasks}Aufgabe</button></div>
+    html: `${other ? `<div class="profile-view">
+        ${avatar(m.id, 96)}
+        <div class="pv-name">${esc(dn(m.id))}</div>
+        ${nickOf(m.id) ? `<div class="small muted">${esc(m.name)}</div>` : ''}
+        <div class="small muted">${[m.floor ? `🏠 ${esc(floorName(m.floor))}` : '', presenceText(m.id)].filter(Boolean).join(' · ')}</div>
+      </div>
+      <div class="row" style="gap:8px;margin-bottom:14px"><button type="button" class="btn block primary" id="m-dm">${I.dm}Nachricht</button><button type="button" class="btn block" id="m-task">${I.tasks}Aufgabe</button></div>
       <div class="field nick-field"><label for="m-nick">🏷️ Dein Spitzname für ${esc(m.name)}</label><input id="m-nick" maxlength="30" placeholder="z. B. Schatz, Flocke …" value="${esc(nickOf(m.id))}">
         <p class="small muted" style="margin:6px 4px 0">Nur du siehst ihn – überall in der App statt „${esc(m.name)}“.</p></div>
-      <div class="divider">Profil von ${esc(m.name)}</div>` : ''}${!m && !asMe ? '<p class="small muted" style="margin-top:0">Für Personen ohne eigenes Gerät – sie können trotzdem Aufgaben und Müll-Dienste bekommen.</p>' : ''}${m && m.id !== state.me && presenceText(m.id) ? `<p class="center small" style="margin:0 0 10px">${presenceText(m.id)}</p>` : ''}${memberForm(v, m ? 'Speichern' : 'Hinzufügen')}`,
+      <button type="button" class="btn block sm danger-soft" id="m-del">${I.door}Aus dem Haus entfernen</button>` : ''}${!m && !asMe ? '<p class="small muted" style="margin-top:0">Für Personen ohne eigenes Gerät – sie können trotzdem Aufgaben und Müll-Dienste bekommen.</p>' : ''}${other ? '' : memberForm(v, m ? 'Speichern' : 'Hinzufügen')}`,
     onMount: (api) => {
-      const f = bindMemberForm(api.el, v, (val) => {
+      const f = other ? api.el : bindMemberForm(api.el, v, (val) => {
         if (m) mutate('members', m.id, (cur) => ({ ...cur, name: val.name, emoji: val.emoji, color: val.color, photo: val.photo || null, floor: val.floor }));
         else {
           const nid = addDoc('members', { name: val.name, emoji: val.emoji, color: val.color, photo: val.photo || null, floor: val.floor, createdAt: Date.now() });
@@ -3140,6 +3147,7 @@ function memberSheet(id, { asMe = false } = {}) {
         if (val === nickOf(m.id)) return;
         mutate('members', state.me, (x) => { const n = { ...(x.nick || {}) }; if (val) n[m.id] = val; else delete n[m.id]; return { ...x, nick: n }; });
         $('.sheet-head h2', api.el).textContent = val || m.name;
+        $('.pv-name', api.el).textContent = val || m.name;
         toast(val ? `🏷️ ${m.name} heißt für dich jetzt „${val}“` : 'Spitzname entfernt');
       });
       nickIn?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); nickIn.blur(); } });
