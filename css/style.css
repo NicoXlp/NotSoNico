@@ -1345,3 +1345,9 @@ img.blur { filter: blur(14px) saturate(1.2); transform: scale(1.08); }
 .dm-msg.flash .dm-bubble.bare:not(.has-quote) .voice { animation: dmFlash 1.5s ease; }
 .dm-msg.sel .dm-bubble.bare:not(.has-quote) .voice { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent); }
 .dm-bubble.media .mgrid { border-radius: 14px; }
+/* Sprachnachricht im Chat etwas schmaler, damit die Hervorhebung nicht am Rand abgeschnitten wird */
+.dm-bubble.bare .voice { min-width: 0; width: min(240px, 66vw); }
+.dm-list { padding-left: 6px; padding-right: 6px; }
+.dm-bubble.bare .voice { width: min(250px, 68vw); gap: 10px; }
+.dm-bubble.bare .wave { gap: 1px; overflow: hidden; }
+.dm-bubble.bare .voice .dur { flex: none; }
