@@ -1351,3 +1351,11 @@ img.blur { filter: blur(14px) saturate(1.2); transform: scale(1.08); }
 .dm-bubble.bare .voice { width: min(250px, 68vw); gap: 10px; }
 .dm-bubble.bare .wave { gap: 1px; overflow: hidden; }
 .dm-bubble.bare .voice .dur { flex: none; }
+
+/* Reaktionsmenü: ohne dunklen Schatten */
+.dm-emo, .dm-ops { box-shadow: var(--glass-inner), 0 0 0 1px color-mix(in srgb, var(--text) 8%, transparent); }
+
+/* Aufklapp-Listen von Auswahlfeldern: immer deckend und gut lesbar (v. a. Windows/Chrome) */
+select option, select optgroup { background-color: #ffffff; color: #1c1c1e; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) select option, :root:not([data-theme="light"]) select optgroup { background-color: #1e1f26; color: #f2f2f7; } }
+:root[data-theme="dark"] select option, :root[data-theme="dark"] select optgroup { background-color: #1e1f26; color: #f2f2f7; }
