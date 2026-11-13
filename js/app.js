@@ -2769,6 +2769,24 @@ const PALETTES = {
   graphite: { name: 'Graphit', accent: ['#3f3f46', '#d4d4d8'], accent2: ['#52525b', '#a1a1aa'],
     light: ['#d4d4d8', '#e4e4e7', '#cbd5e1', '#e7e5e4'], dark: ['#27272a', '#3f3f46', '#1e293b', '#292524'] },
 };
+/** Relative Leuchtdichte (WCAG) einer Hex-Farbe */
+function luminance(hex) {
+  const m = String(hex).replace('#', '').match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  if (!m) return 0.2;
+  const [r, g, b] = m.slice(1).map((x) => { const c = parseInt(x, 16) / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+const contrast = (a, b) => { const x = luminance(a), y = luminance(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+const darken = (hex, t) => '#' + String(hex).replace('#', '').match(/../g).map((x) => Math.round(parseInt(x, 16) * (1 - t)).toString(16).padStart(2, '0')).join('');
+/** Knopf-Farben: möglichst weiße Schrift (Knopf dafür etwas dunkler), sonst dunkle Schrift – immer Kontrast ≥ 4,5:1 */
+function buttonColors(hex) {
+  if (!/^#[0-9a-f]{6}$/i.test(hex)) return { bg: hex, fg: '#ffffff' };
+  for (let t = 0; t <= 0.3; t += 0.02) {
+    const bg = t ? darken(hex, t) : hex;
+    if (contrast(bg, '#ffffff') >= 4.5) return { bg, fg: '#ffffff' };
+  }
+  return { bg: hex, fg: '#111216' };
+}
 const isDark = () => {
   const t = LS.get('theme', 'auto');
   return t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
@@ -2781,6 +2799,10 @@ function applyPalette() {
   const st = document.documentElement.style;
   const accent = key === 'custom' && custom ? custom : p.accent[d];
   st.setProperty('--accent', accent);
+  // Knöpfe & Akzentflächen: gut lesbare Schrift, Fläche bei Bedarf leicht abgedunkelt
+  const btn = buttonColors(accent);
+  st.setProperty('--accent-btn', btn.bg);
+  st.setProperty('--on-accent', btn.fg);
   st.setProperty('--accent-2', key === 'custom' && custom ? `color-mix(in srgb, ${custom} 70%, #7d7aff)` : p.accent2[d]);
   const blobs = key === 'custom' && custom
     ? [custom, `color-mix(in srgb, ${custom} 55%, ${d ? '#000' : '#fff'})`, `color-mix(in srgb, ${custom} 60%, #ff7ab6)`, `color-mix(in srgb, ${custom} 50%, #ffd27a)`]
