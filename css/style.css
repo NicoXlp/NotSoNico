@@ -123,18 +123,18 @@ a { color: var(--accent); }
   display: grid; place-items: center;
   background: radial-gradient(90% 60% at 25% 10%, rgba(255,255,255,.22), transparent 60%), linear-gradient(135deg, #5a6be0, #8f7ff0);
   color: #fff;
-  transition: opacity .45s ease;
+  transition: opacity .6s ease;
   -webkit-user-select: none; user-select: none;
 }
 .splash.out { opacity: 0; pointer-events: none; }
 .sp-stage { display: grid; justify-items: center; -webkit-perspective: 1200px; perspective: 1200px; }
-.sp-float { animation: spIn .55s cubic-bezier(.2, .9, .3, 1.2) both; }
+.sp-float { animation: spIn .8s cubic-bezier(.2, .9, .3, 1.15) both; }
 .sp-book {
   --w: 132px; --h: 182px;
   position: relative; width: calc(var(--w) * 2); height: var(--h);
   -webkit-transform-style: preserve-3d; transform-style: preserve-3d;
   transform: rotateX(14deg);
-  animation: spShift 1s .35s cubic-bezier(.6, .05, .25, 1) both;
+  animation: spShift 1.6s .5s cubic-bezier(.6, .05, .25, 1) both;
 }
 .sp-page, .sp-leaf {
   position: absolute; top: 0; left: 50%; width: var(--w); height: var(--h);
@@ -154,7 +154,7 @@ a { color: var(--accent); }
 .sp-line.short { width: 60%; }
 .sp-back .sp-line { width: 70%; }
 .sp-house { width: 56px; height: 56px; color: #5a6be0; }
-.sp-ribbon { position: absolute; left: -7px; bottom: -26px; width: 14px; height: 34px; background: #ff8a7a; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%); transform-origin: top; animation: spRibbon .45s 1.5s ease-out both; }
+.sp-ribbon { position: absolute; left: -7px; bottom: -26px; width: 14px; height: 34px; background: #ff8a7a; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%); transform-origin: top; animation: spRibbon .6s 2.9s ease-out both; }
 
 /* Einband */
 .sp-cover .sp-front {
@@ -167,9 +167,9 @@ a { color: var(--accent); }
 .sp-cover .sp-back { background: linear-gradient(270deg, #cfd4f6, #eef0fd 22%); }
 
 /* Reihenfolge im geschlossenen Buch: Einband oben, darunter die Seiten */
-.sp-cover { transform: rotateY(0) translateZ(3px); animation: spFlip .95s .4s cubic-bezier(.55, .05, .3, 1) both; --end: -180deg; }
-.sp-leaf1 { transform: rotateY(0) translateZ(2px); animation: spFlip .8s .82s cubic-bezier(.55, .05, .3, 1) both; --end: -179deg; }
-.sp-leaf2 { transform: rotateY(0) translateZ(1px); animation: spFlip .8s 1.0s cubic-bezier(.55, .05, .3, 1) both; --end: -178deg; }
+.sp-cover { transform: rotateY(0) translateZ(3px); animation: spFlip 1.5s .6s cubic-bezier(.55, .05, .3, 1) both; --end: -180deg; }
+.sp-leaf1 { transform: rotateY(0) translateZ(2px); animation: spFlip 1.25s 1.35s cubic-bezier(.55, .05, .3, 1) both; --end: -179deg; }
+.sp-leaf2 { transform: rotateY(0) translateZ(1px); animation: spFlip 1.25s 1.75s cubic-bezier(.55, .05, .3, 1) both; --end: -178deg; }
 
 
 @keyframes spIn { from { opacity: 0; transform: translateY(18px) scale(.82); } }

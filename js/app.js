@@ -2760,13 +2760,13 @@ const pending = { tab: null, done: null };
 /* ─── Startanimation ─────────────────────────────────────────────────────── */
 const SPLASH_HTML = document.getElementById('splash')?.outerHTML || '';
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-let splashShownAt = performance.now();
+let splashShownAt = 0; // Zählt ab dem Öffnen der Seite (performance.now() startet beim Laden)
 function hideSplash({ now = false } = {}) {
   const el = $('#splash');
   if (!el || el.classList.contains('out')) return;
-  const min = reducedMotion() ? 500 : 2050; // Animation einmal ganz zeigen (Buch ist nach ~2 s aufgeschlagen)
+  const min = reducedMotion() ? 500 : 3350; // Animation einmal ganz zeigen (Buch ist nach ~3,5 s aufgeschlagen, kurz stehen lassen)
   const wait = now ? 0 : Math.max(0, min - (performance.now() - splashShownAt));
-  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 650); }, wait);
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 700); }, wait);
 }
 function replaySplash() {
   if (!SPLASH_HTML || $('#splash')) return;
