@@ -1233,3 +1233,20 @@ img.blur { filter: blur(14px) saturate(1.2); transform: scale(1.08); }
 .dm-msg.sel .dm-meta button { display: inline; }
 @media (hover: hover) { .dm-msg.me:hover .dm-meta button { display: inline; } }
 @media (max-width: 380px) { .top-actions { gap: 6px; } .top-actions .add-btn { width: 38px; height: 38px; } .top-actions .add-btn svg { width: 20px; height: 20px; } }
+
+/* ─── Kachel „Neues“ ──────────────────────────────────────────────────────── */
+.news-card { margin: 0 0 12px; padding: 16px 16px 6px; }
+.news-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.news-head h2 { margin: 0; font-size: 20px; font-weight: 750; flex: 1; letter-spacing: -.01em; }
+.news-head .icon-btn { width: 32px; height: 32px; }
+.news-head .icon-btn svg { width: 15px; height: 15px; }
+.news-badge { font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--accent-btn, var(--accent)); color: var(--on-accent, #fff); }
+.news-list { display: grid; }
+.news-item { display: flex; gap: 12px; padding: 10px 0; }
+.news-item + .news-item { border-top: 1px solid var(--sep); }
+.news-ico { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; flex: none; font-size: 19px; background: var(--fill); }
+.news-item .main { flex: 1; min-width: 0; }
+.news-item .title { font-weight: 650; }
+.news-item .small { line-height: 1.3; margin-top: 1px; }
+.news-btn { margin-top: 5px; font-size: 14px; font-weight: 650; color: var(--accent); }
+@media (min-width: 900px) { .news-list { grid-template-columns: repeat(3, 1fr); gap: 0 18px; } .news-item + .news-item { border-top: 0; } }
