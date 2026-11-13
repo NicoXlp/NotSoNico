@@ -185,8 +185,8 @@ function avatar(id, size = 32) {
   const m = member(id);
   if (!m) return `<span class="av" style="--s:${size}px;--c:#8e8e93">?</span>`;
   const dot = size >= 20 && id !== state.me && presenceOf(id)?.online ? '<i class="online-dot" aria-label="online"></i>' : '';
-  if (m.photo) return `<span class="av photo" style="--s:${size}px;--c:${esc(m.color)}" title="${esc(m.name)}"><img src="${esc(m.photo)}" alt="" loading="lazy" decoding="async">${dot}</span>`;
-  return `<span class="av" style="--s:${size}px;--c:${esc(m.color)}" title="${esc(m.name)}">${esc(m.emoji || m.name.slice(0, 1))}${dot}</span>`;
+  if (m.photo) return `<span class="av photo" style="--s:${size}px;--c:${esc(m.color)}" title="${esc(dn(id))}"><img src="${esc(m.photo)}" alt="" loading="lazy" decoding="async">${dot}</span>`;
+  return `<span class="av" style="--s:${size}px;--c:${esc(m.color)}" title="${esc(dn(id))}">${esc(m.emoji || m.name.slice(0, 1))}${dot}</span>`;
 }
 
 /* ─── Online-Status ───────────────────────────────────────────────────────
@@ -242,7 +242,10 @@ function presenceChanged() {
   presenceSig = sig;
   return true;
 }
-const nameOf = (id) => (id === state.me ? 'Du' : member(id)?.name || 'Jemand');
+/** Anzeigename: dein eigener Spitzname für die Person (nur für dich sichtbar) oder ihr Name */
+const nickOf = (id) => (id && id !== state.me ? String(me()?.nick?.[id] || '').trim() : '');
+const dn = (id) => { const m = member(id); return m ? nickOf(id) || m.name : '?'; };
+const nameOf = (id) => (id === state.me ? 'Du' : member(id) ? dn(id) : 'Jemand');
 
 /** Neuigkeit für die Push-Mitteilungen hinterlegen (verschickt der Server alle 5 Min.).
  *  to: Empfänger-IDs oder null = alle außer mir; pref: Art (abschaltbar) */
@@ -814,7 +817,7 @@ function pickups(from, to, scope = 'all') {
 function binFor(bin) {
   const ms = (bin.members || []).filter(member);
   if (!ms.length) return 'ganzes Haus';
-  return ms.map((id) => (id === state.me ? 'dich' : member(id).name)).join(', ');
+  return ms.map((id) => (id === state.me ? 'dich' : dn(id))).join(', ');
 }
 /** Das Bestätigungsfeld: für alle sichtbar, wer die Tonne wann rausgestellt hat */
 function confirmBox(p) {
@@ -856,7 +859,7 @@ async function toggleBinDone(id, date) {
 const binIcon = (bin, lg) => `<span class="bin-icon ${lg ? 'lg' : ''}" style="--c:${esc(binColorFor(bin))}">${I.trash}</span>`;
 /** „Wer ist zuständig?“ – feste Person oder alle, für die die Tonne gilt */
 function binWhoHtml(p, { size = 18, short = false } = {}) {
-  if (p.who) return `${avatar(p.who, size)} ${p.who === state.me ? '<b>Du bist dran</b>' : `${esc(member(p.who)?.name || '?')} ist dran`}`;
+  if (p.who) return `${avatar(p.who, size)} ${p.who === state.me ? '<b>Du bist dran</b>' : `${esc(dn(p.who))} ist dran`}`;
   const ids = (p.bin.members || []).filter(member);
   const all = ids.length ? ids : membersSorted().map((m) => m.id);
   const label = ids.length ? `Für ${esc(binFor(p.bin))}` : 'Für alle';
@@ -940,7 +943,7 @@ function postCard(p, compact = false) {
     <div class="post-head">
       ${avatar(p.author, 40)}
       <div style="flex:1;min-width:0">
-        <div class="who">${esc(member(p.author)?.name || 'Ehemaliges Mitglied')}</div>
+        <div class="who">${esc((member(p.author) ? dn(p.author) : 'Ehemaliges Mitglied'))}</div>
         <div class="meta">${p.pinned ? `<span class="pin-tag">${I.pinned}</span>` : ''}${tag}<span>${relTime(p.createdAt)}</span>${p.editedAt ? '<span>· bearbeitet</span>' : ''}</div>
       </div>
       <button class="icon-btn" data-act="post-menu" data-id="${p.id}" aria-label="Optionen">${I.more}</button>
@@ -954,7 +957,7 @@ function postCard(p, compact = false) {
       <button class="act" data-act="react-pick" data-id="${p.id}" aria-label="Reagieren">${I.smile}</button>
       ${likes.length ? `<span class="spacer"></span><span class="av-stack">${likes.slice(0, 4).map((id) => avatar(id, 24)).join('')}</span>` : ''}
     </div>
-    ${!compact && last ? `<button class="last-comment" data-act="comments" data-id="${p.id}">${avatar(last.author, 22)}<span><b>${esc(member(last.author)?.name || '?')}</b>${richText(last.text.slice(0, 120))}${comments.length > 1 ? ` <span class="muted">· alle ${comments.length} ansehen</span>` : ''}</span></button>` : ''}
+    ${!compact && last ? `<button class="last-comment" data-act="comments" data-id="${p.id}">${avatar(last.author, 22)}<span><b>${esc(dn(last.author))}</b>${richText(last.text.slice(0, 120))}${comments.length > 1 ? ` <span class="muted">· alle ${comments.length} ansehen</span>` : ''}</span></button>` : ''}
   </article>`;
 }
 
@@ -1351,6 +1354,16 @@ function eventBody(p) {
    Neuen Eintrag oben einfügen → die Kachel zeigt immer den neuesten. */
 const NEWS = [
   {
+    id: '2026-11-13-fixes-2',
+    date: '2026-11-13',
+    label: '🛠️ Bug-Fixes',
+    items: [
+      { icon: '🫳', title: 'Gedrückt halten', text: 'Nachricht im Chat gedrückt halten öffnet ein kompaktes Menü: reagieren, antworten, kopieren, löschen.' },
+      { icon: '↪️', title: 'Zur zitierten Nachricht', text: 'Eine Antwort antippen springt direkt zur Nachricht, auf die geantwortet wurde.' },
+      { icon: '🏷️', title: 'Spitznamen', text: 'Im Profil einer Person einen eigenen Spitznamen speichern – nur du siehst ihn.', act: 'tab', v: 'house', btn: 'Zu den Mitbewohner:innen' },
+    ],
+  },
+  {
     id: '2026-11-13-fixes',
     date: '2026-11-13',
     label: '🛠️ Bug-Fixes',
@@ -1427,7 +1440,7 @@ const VIEWS = {
         const n = openTasks().filter((t) => t.assignee === p.id).length;
         const od = openTasks().filter((t) => t.assignee === p.id && t.due && t.due < today()).length;
         return `<button class="person card" data-act="goto-person" data-id="${p.id}">
-          <div class="row">${avatar(p.id, 34)}<div class="name">${esc(p.name)}</div></div>
+          <div class="row">${avatar(p.id, 34)}<div class="name">${esc(dn(p.id))}</div></div>
           <div class="stat">${plural(n, 'offene Aufgabe', 'offene Aufgaben')}${od ? ` · <span style="color:var(--danger)">${od} überfällig</span>` : ''}</div>
           <div class="stat">${p.id === state.me ? '<span class="presence">Das bist du</span>' : presenceText(p.id) || '<span class="presence">–</span>'}</div>
           <div class="meter"><i style="width:${(n / maxLoad) * 100}%"></i></div></button>`;
@@ -1485,7 +1498,7 @@ const VIEWS = {
       <div class="chips">
         ${chip('all', 'Alle', state.taskView === 'open' ? openTasks().length : null)}
         ${chip('mine', 'Meine', state.taskView === 'open' ? myOpenTasks().length : null)}
-        ${people.filter((p) => p.id !== state.me).map((p) => chip(p.id, esc(p.name), state.taskView === 'open' ? cnt((t) => t.assignee === p.id) : null, avatar(p.id, 24))).join('')}
+        ${people.filter((p) => p.id !== state.me).map((p) => chip(p.id, esc(dn(p.id)), state.taskView === 'open' ? cnt((t) => t.assignee === p.id) : null, avatar(p.id, 24))).join('')}
         ${chip('none', '👥 Für alle', state.taskView === 'open' ? cnt((t) => !t.assignee) : null)}
       </div>
       ${content}`;
@@ -1549,7 +1562,7 @@ const VIEWS = {
       ${`<div class="list card tight">${[...state.trash].filter((b) => scope === 'all' || binAppliesTo(b, state.me)).sort((a, b) => a.name.localeCompare(b.name)).map((b) => `
         <button class="list-item" data-act="bin-edit" data-id="${b.id}">
           ${binIcon(b)}
-          <div class="main"><div class="title">${esc(b.name)}</div><div class="sub">${esc(binSchedule(b))} · für ${esc(binFor(b))}${b.rotationSet && (b.rotation || []).filter(member).length ? ` · reihum: ${b.rotation.filter(member).map((id) => esc(member(id).name)).join(' → ')}` : ''}${b.importedBy ? ` · Kalender von ${esc(nameOf(b.importedBy))}` : ''}</div></div>
+          <div class="main"><div class="title">${esc(b.name)}</div><div class="sub">${esc(binSchedule(b))} · für ${esc(binFor(b))}${b.rotationSet && (b.rotation || []).filter(member).length ? ` · reihum: ${b.rotation.filter(member).map((id) => esc(dn(id))).join(' → ')}` : ''}${b.importedBy ? ` · Kalender von ${esc(nameOf(b.importedBy))}` : ''}</div></div>
           <span class="chev">${I.chev}</span>
         </button>`).join('')}</div>`}
 
@@ -1587,10 +1600,10 @@ const VIEWS = {
         return `<div class="list-item member-row">
           <button class="main" data-act="member-edit" data-id="${p.id}">
             ${avatar(p.id, 40)}
-            <span class="txt"><div class="title">${esc(p.name)}${p.id === state.me ? ' <span class="pill blue">Du</span>' : ''}</div>
+            <span class="txt"><div class="title">${esc(dn(p.id))}${nickOf(p.id) ? ` <span class="floor-tag">${esc(p.name)}</span>` : ''}${p.id === state.me ? ' <span class="pill blue">Du</span>' : ''}</div>
             ${presenceText(p.id) ? `<div class="sub">${presenceText(p.id)}</div>` : ''}<div class="sub">${plural(open, 'offene Aufgabe', 'offene Aufgaben')} · ${done} erledigt</div></span>
           </button>
-          ${p.id !== state.me ? `<button class="icon-btn" data-act="dm-open" data-id="${p.id}" aria-label="Nachricht an ${esc(p.name)}">${I.dm}${dmUnread(p.id) ? `<b class="badge">${dmUnread(p.id)}</b>` : ''}</button>` : ''}
+          ${p.id !== state.me ? `<button class="icon-btn" data-act="dm-open" data-id="${p.id}" aria-label="Nachricht an ${esc(dn(p.id))}">${I.dm}${dmUnread(p.id) ? `<b class="badge">${dmUnread(p.id)}</b>` : ''}</button>` : ''}
         </div>`;
       }).join('')}</div>`).join('')}
 
@@ -1708,7 +1721,7 @@ function dmTaskCard(m) {
 function dmMessagesHtml(id, ui = {}) {
   const list = dmWith(id);
   if (!list.length) {
-    return `<div class="empty dm-empty">${avatar(id, 64)}<p>Schreib ${esc(member(id)?.name || '')} die erste Nachricht 👋</p>
+    return `<div class="empty dm-empty">${avatar(id, 64)}<p>Schreib ${esc(dn(id))} die erste Nachricht 👋</p>
       <p class="small muted">Nur ihr beide seht diesen Chat.</p></div>`;
   }
   let day = '';
@@ -1725,7 +1738,7 @@ function dmMessagesHtml(id, ui = {}) {
         : m.media?.length ? mediaGrid({ ...m, text: '' }) + cap
           : richText(m.text);
     const q = m.replyTo ? state.messages.find((x) => x.id === m.replyTo) : null;
-    const quote = m.replyTo ? `<button class="dm-quote" data-jump="${esc(m.replyTo)}"><b>${q ? esc(q.author === state.me ? 'Du' : member(q.author)?.name || '?') : ''}</b><span>${q ? esc(dmPreview({ ...q, author: '' })) : 'Nachricht gelöscht'}</span></button>` : '';
+    const quote = m.replyTo ? `<button class="dm-quote" data-jump="${esc(m.replyTo)}"><b>${q ? esc(q.author === state.me ? 'Du' : dn(q.author)) : ''}</b><span>${q ? esc(dmPreview({ ...q, author: '' })) : 'Nachricht gelöscht'}</span></button>` : '';
     const reacts = Object.entries(m.reactions || {});
     const counts = {};
     reacts.forEach(([, e]) => { counts[e] = (counts[e] || 0) + 1; });
@@ -1733,10 +1746,13 @@ function dmMessagesHtml(id, ui = {}) {
     const sel = ui.sel === m.id;
     return `${sep}<div class="dm-msg ${mine ? 'me' : ''} ${sel ? 'sel' : ''}" data-mid="${m.id}">
       <span class="dm-swipe-ico" aria-hidden="true">${I.reply}</span>
-      ${sel ? `<div class="dm-actions" role="toolbar" aria-label="Reagieren">
-        ${QUICK_REACTIONS.slice(0, 6).map((e) => `<button data-react="${e}" class="${m.reactions?.[state.me] === e ? 'on' : ''}" aria-label="Mit ${e} reagieren">${e}</button>`).join('')}
-        <button class="dm-act-txt" data-reply="${m.id}">${I.reply}Antworten</button>
-        ${mine ? `<button class="dm-act-txt danger" data-dmdel="${m.id}" aria-label="Löschen">${I.trash}</button>` : ''}
+      ${sel ? `<div class="dm-actions">
+        <div class="dm-emo" role="toolbar" aria-label="Reagieren">${QUICK_REACTIONS.slice(0, 6).map((e) => `<button data-react="${e}" class="${m.reactions?.[state.me] === e ? 'on' : ''}" aria-label="Mit ${e} reagieren">${e}</button>`).join('')}</div>
+        <div class="dm-ops">
+          <button data-reply="${m.id}">${I.reply}Antworten</button>
+          ${m.text ? `<button data-copy="${m.id}">${I.copy}Kopieren</button>` : ''}
+          ${mine ? `<button class="danger" data-dmdel="${m.id}">${I.trash}Löschen</button>` : ''}
+        </div>
       </div>` : ''}
       <div class="dm-bubble ${kind} ${quote ? 'has-quote' : ''}">${quote}${body}</div>
       ${reacts.length ? `<button class="dm-reacts" data-react-list="${m.id}" title="${esc(reacts.map(([who, e]) => `${e} ${nameOf(who)}`).join(', '))}">${Object.entries(counts).map(([e, n]) => `${e}${n > 1 ? `<small>${n}</small>` : ''}`).join('')}</button>` : ''}
@@ -1773,20 +1789,21 @@ function chatSheet(id) {
   const ui = { sel: null, reply: null };
   let root = null; // Sheet-Element (steht schon in onMount bereit)
   const api = openSheet({
-    title: other.name,
-    html: `<div class="dm-pres small muted" id="dm-pres">${[floorName(other.floor), presenceText(id)].filter(Boolean).join(' · ')}</div>
+    title: dn(id),
+    html: `<div class="dm-pres small muted" id="dm-pres">${[nickOf(id) ? esc(other.name) : '', floorName(other.floor), presenceText(id)].filter(Boolean).join(' · ')}</div>
       <div class="dm-list" id="dmlist"></div>
       <div class="dm-replybar" id="dm-rb" hidden></div>
       <form class="composer dm-bar" id="dmf">
         <button type="button" class="icon-btn dm-tool" id="dm-task" aria-label="Aufgabe zuteilen" title="Aufgabe zuteilen">${I.tasks}</button>
         <label class="icon-btn dm-tool" aria-label="Foto oder Video senden" title="Foto oder Video senden">${I.photo}<input type="file" id="dm-file" accept="image/*,video/*" multiple hidden></label>
-        <textarea id="dmt" rows="1" maxlength="2000" placeholder="Nachricht …" aria-label="Nachricht an ${esc(other.name)}"></textarea>
+        <textarea id="dmt" rows="1" maxlength="2000" placeholder="Nachricht …" aria-label="Nachricht an ${esc(dn(id))}"></textarea>
         <button type="button" class="send" id="dm-mic" aria-label="Sprachnachricht aufnehmen">${I.mic}</button>
         <button type="submit" class="send" id="dm-send" aria-label="Senden" hidden>${I.send}</button>
       </form>`,
     refresh: (api) => {
       if (!member(id)) return api.close();
-      $('#dm-pres', api.el).innerHTML = [floorName(member(id).floor), presenceText(id)].filter(Boolean).join(' · ');
+      $('#dm-pres', api.el).innerHTML = [nickOf(id) ? esc(member(id).name) : '', floorName(member(id).floor), presenceText(id)].filter(Boolean).join(' · ');
+      const h2 = $('.sheet-head h2', api.el); if (h2.textContent !== dn(id)) h2.textContent = dn(id);
       paint();
       if (!document.hidden) dmMarkRead(id);
     },
@@ -1815,15 +1832,38 @@ function chatSheet(id) {
       };
       $('#dm-task', f).onclick = () => taskSheet(null, {
         assignee: id,
-        title: `Aufgabe für ${other.name}`,
+        title: `Aufgabe für ${dn(id)}`,
         onCreate: (taskId) => sendDm(id, { taskId }, { push: false }),
       });
       $('#dm-rb', api.el).addEventListener('click', (e) => { if (e.target.closest('[data-rb-x]')) setReply(null); });
 
-      // Tippen: Reaktionen/Antworten/Löschen ein- und ausblenden
+      // Gedrückt halten → Menü (Reaktionen, Antworten, Kopieren, Löschen)
+      // Tippen auf eine Antwort → zur zitierten Nachricht springen
       let swiped = false;
+      const jumpTo = (mid) => {
+        const t = $(`[data-mid="${CSS.escape(mid)}"]`, list);
+        if (!t) return toast('Die Nachricht gibt es nicht mehr');
+        t.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        t.classList.remove('flash'); void t.offsetWidth; t.classList.add('flash');
+        setTimeout(() => t.classList.remove('flash'), 1500);
+      };
+      const openMenu = (mid) => { ui.sel = mid; haptic(15); getSelection()?.removeAllRanges(); paint(); };
+      list.addEventListener('contextmenu', (e) => {
+        const msg = e.target.closest('.dm-msg');
+        if (!msg || e.target.closest('video')) return;
+        e.preventDefault();
+        openMenu(msg.dataset.mid);
+      });
       list.addEventListener('click', async (e) => {
         if (swiped) { swiped = false; return; }
+        if (Date.now() - lpAt < 450 && !e.target.closest('.dm-actions')) return;
+        const cp = e.target.closest('[data-copy]');
+        if (cp) {
+          const m = state.messages.find((x) => x.id === cp.dataset.copy);
+          ui.sel = null; paint();
+          try { await navigator.clipboard.writeText(m?.text || ''); toast('📋 Kopiert'); } catch { toast('Kopieren hat nicht geklappt'); }
+          return;
+        }
         const r = e.target.closest('[data-react]');
         if (r) { dmReact(ui.sel, r.dataset.react); ui.sel = null; return paint(); }
         const rp = e.target.closest('[data-reply]');
@@ -1834,32 +1874,42 @@ function chatSheet(id) {
           if (m && await confirmSheet('Nachricht für euch beide löschen?')) { ui.sel = null; dmDelete(m); }
           return;
         }
+        if (ui.sel && !e.target.closest('.dm-actions')) { ui.sel = null; paint(); return; }
         const j = e.target.closest('[data-jump]');
-        if (j) {
-          const t = $(`[data-mid="${CSS.escape(j.dataset.jump)}"]`, list);
-          if (t) { t.scrollIntoView({ behavior: 'smooth', block: 'center' }); t.classList.add('flash'); setTimeout(() => t.classList.remove('flash'), 1200); }
-          return;
-        }
+        if (j) return jumpTo(j.dataset.jump);
         if (e.target.closest('[data-react-list]')) {
           const m = state.messages.find((x) => x.id === e.target.closest('[data-react-list]').dataset.reactList);
           if (m) toast(Object.entries(m.reactions || {}).map(([who, em]) => `${em} ${nameOf(who)}`).join(' · '));
           return;
         }
+        // Antwort-Nachricht antippen (nicht auf Knöpfe/Tonspur) → zum Original
         const msg = e.target.closest('.dm-msg');
-        if (msg && !e.target.closest('button, a, .wave, video')) { ui.sel = ui.sel === msg.dataset.mid ? null : msg.dataset.mid; paint(); }
-        else if (!msg && ui.sel) { ui.sel = null; paint(); }
+        const m = msg && state.messages.find((x) => x.id === msg.dataset.mid);
+        if (m?.replyTo && e.target.closest('.dm-bubble') && !e.target.closest('button, a, .wave, video')) jumpTo(m.replyTo);
       });
 
       // Nach rechts wischen → antworten
-      let sw = null;
+      let sw = null, lp = 0, lpAt = 0;
+      const cancelLp = () => { clearTimeout(lp); lp = 0; };
       list.addEventListener('pointerdown', (e) => {
         const msg = e.target.closest('.dm-msg');
         if (!msg || e.target.closest('.wave, .dm-actions') || (e.pointerType === 'mouse' && e.button !== 0)) return;
         sw = { el: msg, x: e.clientX, y: e.clientY, dx: 0, on: false, id: e.pointerId };
+        cancelLp();
+        if (e.target.closest('.dm-bubble')) {
+          lp = setTimeout(() => {
+            lp = 0;
+            if (!sw || sw.on) return;
+            sw = null;
+            lpAt = Date.now(); // den Klick beim Loslassen ignorieren
+            openMenu(msg.dataset.mid);
+          }, 450);
+        }
       });
       list.addEventListener('pointermove', (e) => {
         if (!sw || e.pointerId !== sw.id) return;
         const dx = e.clientX - sw.x, dy = e.clientY - sw.y;
+        if (Math.abs(dx) > 8 || Math.abs(dy) > 8) cancelLp();
         if (!sw.on) {
           if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { sw = null; return; }
           if (dx > 12 && dx > Math.abs(dy) * 1.5) { sw.on = true; sw.el.classList.add('swiping'); getSelection()?.removeAllRanges(); try { list.setPointerCapture(e.pointerId); } catch { /* egal */ } }
@@ -1871,6 +1921,7 @@ function chatSheet(id) {
         sw.el.classList.toggle('armed', sw.dx > 60);
       });
       const end = () => {
+        cancelLp();
         if (!sw) return;
         const { el, on, dx } = sw;
         sw = null;
@@ -1883,6 +1934,7 @@ function chatSheet(id) {
       };
       list.addEventListener('pointerup', end);
       list.addEventListener('pointercancel', end);
+      list.addEventListener('scroll', cancelLp, { passive: true });
 
       api.refresh(api);
     },
@@ -1896,7 +1948,7 @@ function chatSheet(id) {
     const m = mid && state.messages.find((x) => x.id === mid);
     bar.hidden = !m;
     if (m) {
-      bar.innerHTML = `<span class="dm-rb-ico">${I.reply}</span><div class="dm-rb-txt"><b>Antwort an ${esc(m.author === state.me ? 'dich selbst' : member(m.author)?.name || '?')}</b><span>${esc(dmPreview({ ...m, author: '' }))}</span></div>
+      bar.innerHTML = `<span class="dm-rb-ico">${I.reply}</span><div class="dm-rb-txt"><b>Antwort an ${esc(m.author === state.me ? 'dich selbst' : dn(m.author))}</b><span>${esc(dmPreview({ ...m, author: '' }))}</span></div>
         <button type="button" class="icon-btn" data-rb-x aria-label="Antwort abbrechen">${I.close}</button>`;
     }
   }
@@ -1918,7 +1970,7 @@ function dmMediaSheet(to, files, extra = {}, onSent) {
   const items = [];
   let processing = 0;
   openSheet({
-    title: `📷 An ${member(to)?.name || ''}`,
+    title: `📷 An ${dn(to)}`,
     html: `<form id="mf2"><div class="attach" id="dm-att"></div>
       <div class="field"><label for="dm-cap">Text dazu (optional)</label><input id="dm-cap" maxlength="500" placeholder="z. B. Schau mal 😄"></div>
       <div class="sheet-actions"><button class="btn primary" type="submit">${I.send}Senden</button></div></form>`,
@@ -1971,7 +2023,7 @@ function dmMediaSheet(to, files, extra = {}, onSent) {
 function dmVoiceSheet(to, extra = {}, onSent) {
   let recorder = null;
   openSheet({
-    title: `🎤 An ${member(to)?.name || ''}`,
+    title: `🎤 An ${dn(to)}`,
     onClose: () => recorder?.cleanup(),
     html: `<form id="vf"><div data-k="voice">
         <div class="recorder card">
@@ -2026,7 +2078,7 @@ function dmListSheet() {
       const l = last(m.id), n = dmUnread(m.id);
       return `<button class="list-item" data-dm="${m.id}">
         ${avatar(m.id, 44)}
-        <div class="main"><div class="title">${esc(m.name)}${m.floor ? ` <span class="floor-tag">${esc(floorName(m.floor))}</span>` : ''}</div>
+        <div class="main"><div class="title">${esc(dn(m.id))}${m.floor ? ` <span class="floor-tag">${esc(floorName(m.floor))}</span>` : ''}</div>
           <div class="sub ${n ? 'strong' : ''}">${l ? esc(dmPreview(l)) : 'Noch keine Nachrichten'}</div></div>
         <div class="dm-side">${l ? `<span class="small muted">${esc(shortTime(l.createdAt))}</span>` : ''}${n ? `<b class="badge">${n}</b>` : ''}</div>
       </button>`;
@@ -2047,7 +2099,7 @@ function dmListSheet() {
    Sheets: Aufgaben
    ═══════════════════════════════════════════════════════════════════════════ */
 function memberOptions(selected, allLabel = '👥 Alle / wer Zeit hat') {
-  return `<option value="">${allLabel}</option>${membersSorted().map((m) => `<option value="${m.id}" ${m.id === selected ? 'selected' : ''}>${esc(m.emoji || '')} ${esc(m.name)}${m.id === state.me ? ' (du)' : ''}</option>`).join('')}`;
+  return `<option value="">${allLabel}</option>${membersSorted().map((m) => `<option value="${m.id}" ${m.id === selected ? 'selected' : ''}>${esc(m.emoji || '')} ${esc(dn(m.id))}${m.id === state.me ? ' (du)' : ''}</option>`).join('')}`;
 }
 
 function taskSheet(id, preset = {}) {
@@ -2126,7 +2178,7 @@ function binSheet(id, preset = {}) {
   const rotHtml = () => {
     const rest = membersSorted().filter((m) => !rotation.includes(m.id));
     return `${rotation.length ? rotation.map((id, i) => `<div class="list-item" style="padding:8px 4px;min-height:0">
-        <span class="pill">${i + 1}</span>${avatar(id, 28)}<div class="main title">${esc(member(id).name)}</div>
+        <span class="pill">${i + 1}</span>${avatar(id, 28)}<div class="main title">${esc(dn(id))}</div>
         <button type="button" class="icon-btn" data-rot-up="${i}" aria-label="Nach oben" ${i ? '' : 'disabled style="opacity:.3"'}>↑</button>
         <button type="button" class="icon-btn" data-rot-del="${i}" aria-label="Entfernen">${I.close}</button></div>`).join('')
       : '<p class="small muted" style="margin:4px">Keine feste Reihenfolge – die Tonne ist für alle, alle werden erinnert.</p>'}
@@ -2300,7 +2352,7 @@ function icsImport() {
 function icsExport() {
   const evs = pickups(today(), addDays(today(), 365)).map((p) => ({
     uid: `${p.bin.id}-${p.date}`,
-    title: `🗑️ ${p.bin.name}${p.who ? ` (${member(p.who)?.name || ''} ist dran)` : ''}`,
+    title: `🗑️ ${p.bin.name}${p.who ? ` (${dn(p.who)} ist dran)` : ''}`,
     date: p.date,
     desc: 'Am Vorabend rausstellen. – Vermietertagebuch',
     alarm: '-PT6H', // ganztägig → Erinnerung am Vortag um 18 Uhr
@@ -2531,7 +2583,7 @@ function commentsSheet(id) {
     if (!p) return '<p class="muted">Beitrag wurde gelöscht.</p>';
     const cs = p.comments || [];
     return cs.length ? cs.map((c) => `<div class="comment">${avatar(c.author, 32)}<div style="min-width:0;flex:1">
-        <div class="bubble"><div class="who">${esc(member(c.author)?.name || '?')}</div><div class="txt">${richText(c.text)}</div></div>
+        <div class="bubble"><div class="who">${esc(dn(c.author))}</div><div class="txt">${richText(c.text)}</div></div>
         <div class="meta"><span>${relTime(c.at)}</span>${c.author === state.me ? `<button data-cdel="${c.id}">Löschen</button>` : ''}</div></div></div>`).join('')
       : '<div class="empty"><div class="big">💬</div>Noch keine Kommentare. Schreib den ersten!</div>';
   };
@@ -3043,8 +3095,11 @@ function memberSheet(id, { asMe = false } = {}) {
   const m = id ? member(id) : null;
   const v = m ? { ...m } : randomMember();
   openSheet({
-    title: m ? (m.id === state.me ? 'Mein Profil' : m.name) : asMe ? 'Wer bist du?' : 'Mitglied hinzufügen',
-    html: `${m && m.id !== state.me ? `<div class="row" style="gap:8px;margin-bottom:14px"><button type="button" class="btn block primary" id="m-dm">${I.dm}Nachricht</button><button type="button" class="btn block" id="m-task">${I.tasks}Aufgabe zuteilen</button></div>` : ''}${!m && !asMe ? '<p class="small muted" style="margin-top:0">Für Personen ohne eigenes Gerät – sie können trotzdem Aufgaben und Müll-Dienste bekommen.</p>' : ''}${m && m.id !== state.me && presenceText(m.id) ? `<p class="center small" style="margin:0 0 10px">${presenceText(m.id)}</p>` : ''}${memberForm(v, m ? 'Speichern' : 'Hinzufügen')}`,
+    title: m ? (m.id === state.me ? 'Mein Profil' : dn(m.id)) : asMe ? 'Wer bist du?' : 'Mitglied hinzufügen',
+    html: `${m && m.id !== state.me ? `<div class="row" style="gap:8px;margin-bottom:14px"><button type="button" class="btn block primary" id="m-dm">${I.dm}Nachricht</button><button type="button" class="btn block" id="m-task">${I.tasks}Aufgabe</button></div>
+      <div class="field nick-field"><label for="m-nick">🏷️ Dein Spitzname für ${esc(m.name)}</label><input id="m-nick" maxlength="30" placeholder="z. B. Schatz, Flocke …" value="${esc(nickOf(m.id))}">
+        <p class="small muted" style="margin:6px 4px 0">Nur du siehst ihn – überall in der App statt „${esc(m.name)}“.</p></div>
+      <div class="divider">Profil von ${esc(m.name)}</div>` : ''}${!m && !asMe ? '<p class="small muted" style="margin-top:0">Für Personen ohne eigenes Gerät – sie können trotzdem Aufgaben und Müll-Dienste bekommen.</p>' : ''}${m && m.id !== state.me && presenceText(m.id) ? `<p class="center small" style="margin:0 0 10px">${presenceText(m.id)}</p>` : ''}${memberForm(v, m ? 'Speichern' : 'Hinzufügen')}`,
     onMount: (api) => {
       const f = bindMemberForm(api.el, v, (val) => {
         if (m) mutate('members', m.id, (cur) => ({ ...cur, name: val.name, emoji: val.emoji, color: val.color, photo: val.photo || null, floor: val.floor }));
@@ -3056,7 +3111,16 @@ function memberSheet(id, { asMe = false } = {}) {
         api.close();
       });
       $('#m-dm', api.el)?.addEventListener('click', () => { api.close(); chatSheet(m.id); });
-      $('#m-task', api.el)?.addEventListener('click', () => { api.close(); taskSheet(null, { assignee: m.id, title: `Aufgabe für ${m.name}` }); });
+      $('#m-task', api.el)?.addEventListener('click', () => { api.close(); taskSheet(null, { assignee: m.id, title: `Aufgabe für ${dn(m.id)}` }); });
+      const nickIn = $('#m-nick', api.el);
+      nickIn?.addEventListener('change', () => {
+        const val = nickIn.value.trim().slice(0, 30);
+        if (val === nickOf(m.id)) return;
+        mutate('members', state.me, (x) => { const n = { ...(x.nick || {}) }; if (val) n[m.id] = val; else delete n[m.id]; return { ...x, nick: n }; });
+        $('.sheet-head h2', api.el).textContent = val || m.name;
+        toast(val ? `🏷️ ${m.name} heißt für dich jetzt „${val}“` : 'Spitzname entfernt');
+      });
+      nickIn?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); nickIn.blur(); } });
       $('#m-del', f)?.addEventListener('click', async () => {
         if (await confirmSheet(`${m.name} aus dem Haus entfernen? Zugewiesene Aufgaben werden „für alle“.`)) {
           state.tasks.filter((t) => t.assignee === m.id).forEach((t) => mutate('tasks', t.id, (x) => ({ ...x, assignee: null })));
