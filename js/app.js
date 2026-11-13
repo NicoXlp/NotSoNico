@@ -684,6 +684,15 @@ function taskRow(t) {
 
 /* ─── Müll-Logik ─────────────────────────────────────────────────────────── */
 const memberIds = () => membersSorted().map((m) => m.id);
+/** Die früher per „Standard-Tonnen anlegen“ erzeugten, nie angepassten Beispiel-Tonnen */
+function exampleBins() {
+  const names = DEFAULT_BINS.map((b) => b.name);
+  const ex = state.trash.filter((b) => names.includes(b.name) && b.mode === 'interval' && +b.interval === 2
+    && !(b.dates || []).length && !b.importedBy && !(b.members || []).length && b.createdAt);
+  if (ex.length !== DEFAULT_BINS.length || new Set(ex.map((b) => b.name)).size !== ex.length) return [];
+  const t = ex.map((b) => b.createdAt);
+  return Math.max(...t) - Math.min(...t) < 5000 ? ex : [];
+}
 const binWho = (bin, p) => binWhoRaw(bin, p, memberIds());
 /** scope: 'mine' = nur Tonnen, die für mich gelten; 'all' = alle */
 function pickups(from, to, scope = 'all') {
@@ -1311,9 +1320,10 @@ const VIEWS = {
 
     return `${header('Abholplan', 'Müllabfuhr')}
       ${state.trash.length ? segmented([['mine', 'Für mich'], ['all', 'Ganzes Haus']], scope, 'bin-scope') : ''}
+      ${exampleBins().length ? `<div class="banner"><span style="font-size:20px">💡</span><span style="flex:1">Das sind <b>Beispiel-Tonnen</b> mit erfundenen Terminen. Am besten entfernen und eure echten Tonnen anlegen oder den Abfallkalender hochladen.</span><button data-act="bins-examples-del">Entfernen</button></div>` : ''}
       ${notifyCard()}
-      ${state.trash.length ? '' : `<div class="card empty"><div class="big">🗑️</div><h3>Noch keine Tonnen</h3><p class="muted" style="margin-bottom:14px">Lege eure Tonnen an oder importiere den Abfuhrkalender eurer Stadt (.ics).</p>
-        <div class="row wrap" style="justify-content:center"><button class="btn sm primary" data-act="bins-default">Standard-Tonnen anlegen</button><button class="btn sm" data-act="ics-import">${I.upload}Kalender importieren</button></div></div>`}
+      ${state.trash.length ? '' : `<div class="card empty"><div class="big">🗑️</div><h3>Noch keine Tonnen</h3><p class="muted" style="margin-bottom:14px">Lade den Abfallkalender eurer Stadt hoch (.ics) oder lege eure Tonnen von Hand an.</p>
+        <div class="row wrap" style="justify-content:center"><button class="btn sm primary" data-act="ics-import">${I.upload}Abfallkalender hochladen</button><button class="btn sm" data-act="bin-new">${I.plus}Tonne anlegen</button></div></div>`}
 
       ${state.trash.length ? `<h2 class="section-title">Die nächsten 6 Wochen</h2>
       ${Object.keys(byDate).length ? Object.entries(byDate).map(([d, ps]) => `
@@ -1326,7 +1336,7 @@ const VIEWS = {
           </div>
           <div class="confirm-row">${confirmBox(p)}</div>`).join('')}</div>`).join('') : `<div class="card empty">Keine Termine in den nächsten 6 Wochen.</div>`}` : ''}
 
-      <h2 class="section-title">Kalender</h2>
+      ${state.trash.length ? `<h2 class="section-title">Kalender</h2>
       <div class="card cal">
         <div class="cal-head">
           <button class="icon-btn" data-act="cal-move" data-v="-1" aria-label="Vorheriger Monat">${I.left}</button>
@@ -1337,17 +1347,17 @@ const VIEWS = {
       </div>
 
       <h2 class="section-title">Tonnen <button class="link" data-act="bin-new">Hinzufügen</button></h2>
-      ${state.trash.length ? `<div class="list card tight">${[...state.trash].filter((b) => scope === 'all' || binAppliesTo(b, state.me)).sort((a, b) => a.name.localeCompare(b.name)).map((b) => `
+      ${`<div class="list card tight">${[...state.trash].filter((b) => scope === 'all' || binAppliesTo(b, state.me)).sort((a, b) => a.name.localeCompare(b.name)).map((b) => `
         <button class="list-item" data-act="bin-edit" data-id="${b.id}">
           ${binIcon(b)}
           <div class="main"><div class="title">${esc(b.name)}</div><div class="sub">${esc(binSchedule(b))} · für ${esc(binFor(b))}${(b.rotation || []).filter(member).length ? ` · reihum: ${b.rotation.filter(member).map((id) => esc(member(id).name)).join(' → ')}` : ''}${b.importedBy ? ` · Kalender von ${esc(nameOf(b.importedBy))}` : ''}</div></div>
           <span class="chev">${I.chev}</span>
-        </button>`).join('')}</div>` : ''}
+        </button>`).join('')}</div>`}
 
       <div class="row wrap" style="margin-top:14px;justify-content:center">
         <button class="btn sm chip-glass" data-act="ics-import">${I.upload}Abfallkalender hochladen (.ics)</button>
-        ${state.trash.length ? `<button class="btn sm chip-glass" data-act="ics-export">${I.cal}In meinen Kalender exportieren</button>` : ''}
-      </div>`;
+        <button class="btn sm chip-glass" data-act="ics-export">${I.cal}In meinen Kalender exportieren</button>
+      </div>` : ''}`;
   },
 
   board() {
@@ -2450,10 +2460,11 @@ const ACTIONS = {
   notify: () => notifySheet(),
   'bin-new': () => binSheet(),
   'bin-edit': (d) => binSheet(d.id),
-  'bins-default': () => {
-    const rot = membersSorted().map((m) => m.id);
-    DEFAULT_BINS.forEach((b, i) => addDoc('trash', { ...b, mode: 'interval', start: addDays(today(), i + 1), interval: 2, dates: [], rotation: rot, done: {}, createdAt: Date.now() + i }));
-    toast('✓ Angelegt – tippe eine Tonne an, um den Rhythmus anzupassen', 4000);
+  'bins-examples-del': async () => {
+    const ex = exampleBins();
+    if (!ex.length || !(await confirmSheet(`Die ${ex.length} Beispiel-Tonnen (${ex.map((b) => b.name).join(', ')}) für alle entfernen?`, 'Entfernen'))) return;
+    ex.forEach((b) => removeDoc('trash', b.id));
+    toast('🧹 Beispiel-Tonnen entfernt');
   },
   'ics-import': () => icsImport(),
   'ics-export': () => icsExport(),
