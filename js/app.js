@@ -381,39 +381,25 @@ function toast(msg, ms = 2600) {
 }
 
 const sheets = [];
-/* Hintergrund festhalten, solange ein Sheet offen ist (auch iOS: body fixieren statt nur overflow) */
-let scrollLockY = null;
+/* Hintergrund festhalten, solange ein Sheet offen ist.
+   Ohne body{position:fixed} – das erzeugt auf iPhones (Home-Bildschirm-App) unten einen schwarzen Streifen.
+   Stattdessen: overflow:hidden + Wisch-Gesten außerhalb der scrollbaren Sheet-Bereiche abfangen. */
+let scrollLocked = false;
 function lockScroll() {
-  if (scrollLockY != null) return;
-  scrollLockY = window.scrollY;
-  const b = document.body.style;
-  b.position = 'fixed'; b.top = `-${scrollLockY}px`; b.left = '0'; b.right = '0'; b.width = '100%';
+  if (scrollLocked) return;
+  scrollLocked = true;
   document.documentElement.classList.add('sheet-open');
 }
-/* iOS: sichtbaren Bereich verfolgen (Tastatur auf/zu). Sheets passen sich daran an,
-   und nach dem Schließen der Tastatur bleibt unten kein schwarzer Streifen. */
-function syncViewport() {
-  const vv = window.visualViewport;
-  const st = document.documentElement.style;
-  if (!vv) return;
-  st.setProperty('--vv-h', `${Math.round(vv.height)}px`);
-  st.setProperty('--vv-top', `${Math.round(vv.offsetTop)}px`);
-  if (scrollLockY != null && window.scrollY !== 0) window.scrollTo(0, 0);
-}
-window.visualViewport?.addEventListener('resize', syncViewport);
-window.visualViewport?.addEventListener('scroll', syncViewport);
-document.addEventListener('focusout', () => setTimeout(syncViewport, 60));
-syncViewport();
-
 function unlockScroll() {
-  if (scrollLockY == null) return;
-  const y = scrollLockY;
-  scrollLockY = null;
-  const b = document.body.style;
-  b.position = b.top = b.left = b.right = b.width = '';
+  if (!scrollLocked) return;
+  scrollLocked = false;
   document.documentElement.classList.remove('sheet-open');
-  window.scrollTo(0, y);
 }
+document.addEventListener('touchmove', (e) => {
+  if (!scrollLocked) return;
+  const sc = e.target.closest?.('.sheet-body, .dm-list, textarea, .attach, .emoji-pick, .chips, .viewer');
+  if (!sc || sc.scrollHeight <= sc.clientHeight && sc.scrollWidth <= sc.clientWidth) e.preventDefault();
+}, { passive: false });
 
 function openSheet({ title, html, onMount, refresh, onClose }) {
   const wrap = document.createElement('div');
