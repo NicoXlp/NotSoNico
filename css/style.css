@@ -1549,3 +1549,7 @@ html.sheet-open, html.sheet-open body { overflow: hidden; overscroll-behavior: n
 /* Profilbilder: als Hintergrund gemalt – kein farbiges Aufblitzen beim Neuzeichnen (z. B. beim Schieben der Regler) */
 .av.photo { background-color: var(--fill); background-size: cover; background-position: center; background-repeat: no-repeat; }
 .pill.priv { font-size: 11px; padding: 1px 7px; vertical-align: 1px; }
+
+/* @everyone */
+.mention.all { background: color-mix(in srgb, var(--warning) 22%, transparent); color: inherit; font-weight: 700; }
+.everyone-av { background: color-mix(in srgb, var(--warning) 30%, var(--fill)); font-size: 14px; }
