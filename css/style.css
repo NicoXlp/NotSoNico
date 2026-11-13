@@ -1376,3 +1376,21 @@ html.sheet-open, html.sheet-open body { overscroll-behavior: none; }
 input, textarea, select, [contenteditable="true"], .dm-sheet input, .dm-sheet textarea {
   -webkit-user-select: text; user-select: text; -webkit-touch-callout: default;
 }
+
+/* Sheets füllen genau den sichtbaren Bereich (iOS: auch bei/nach Tastatur) */
+.sheet-wrap { top: var(--vv-top, 0px); bottom: auto; height: var(--vv-h, 100%); }
+@media (max-width: 699px) {
+  /* Chat bis ganz unten: kein Leerraum unter dem Eingabefeld, nur Platz für die Home-Leiste */
+  .sheet { max-height: calc(var(--vv-h, 100dvh) - var(--safe-t) - 24px); }
+  .dm-sheet .sheet { height: calc(100% - var(--safe-t) - 10px); max-height: none; padding-bottom: 0; }
+  .dm-sheet .sheet-body { padding-bottom: max(10px, calc(var(--safe-b) - 6px)); }
+}
+
+/* Schmale, dezente Scrollleiste wie am Handy (PC) */
+.dm-list, .sheet-body { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+.dm-list:hover, .sheet-body:hover { scrollbar-color: color-mix(in srgb, var(--text) 28%, transparent) transparent; }
+.dm-list::-webkit-scrollbar, .sheet-body::-webkit-scrollbar { width: 6px; height: 6px; }
+.dm-list::-webkit-scrollbar-track, .sheet-body::-webkit-scrollbar-track { background: transparent; }
+.dm-list::-webkit-scrollbar-thumb, .sheet-body::-webkit-scrollbar-thumb { background: transparent; border-radius: 3px; }
+.dm-list:hover::-webkit-scrollbar-thumb, .sheet-body:hover::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--text) 28%, transparent); }
+.dm-list::-webkit-scrollbar-button, .sheet-body::-webkit-scrollbar-button { display: none; height: 0; }

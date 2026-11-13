@@ -390,6 +390,21 @@ function lockScroll() {
   b.position = 'fixed'; b.top = `-${scrollLockY}px`; b.left = '0'; b.right = '0'; b.width = '100%';
   document.documentElement.classList.add('sheet-open');
 }
+/* iOS: sichtbaren Bereich verfolgen (Tastatur auf/zu). Sheets passen sich daran an,
+   und nach dem Schließen der Tastatur bleibt unten kein schwarzer Streifen. */
+function syncViewport() {
+  const vv = window.visualViewport;
+  const st = document.documentElement.style;
+  if (!vv) return;
+  st.setProperty('--vv-h', `${Math.round(vv.height)}px`);
+  st.setProperty('--vv-top', `${Math.round(vv.offsetTop)}px`);
+  if (scrollLockY != null && window.scrollY !== 0) window.scrollTo(0, 0);
+}
+window.visualViewport?.addEventListener('resize', syncViewport);
+window.visualViewport?.addEventListener('scroll', syncViewport);
+document.addEventListener('focusout', () => setTimeout(syncViewport, 60));
+syncViewport();
+
 function unlockScroll() {
   if (scrollLockY == null) return;
   const y = scrollLockY;
