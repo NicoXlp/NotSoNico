@@ -1394,3 +1394,14 @@ input, textarea, select, [contenteditable="true"], .dm-sheet input, .dm-sheet te
 .dm-list::-webkit-scrollbar-thumb, .sheet-body::-webkit-scrollbar-thumb { background: transparent; border-radius: 3px; }
 .dm-list:hover::-webkit-scrollbar-thumb, .sheet-body:hover::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--text) 28%, transparent); }
 .dm-list::-webkit-scrollbar-button, .sheet-body::-webkit-scrollbar-button { display: none; height: 0; }
+
+/* Scroll-Sperre ohne body-Fixierung; Sheets wieder über den ganzen Bildschirm */
+html.sheet-open, html.sheet-open body { overflow: hidden; overscroll-behavior: none; }
+.sheet-wrap { top: 0; bottom: 0; height: auto; }
+@media (max-width: 699px) {
+  .sheet { max-height: calc(100dvh - var(--safe-t) - 24px); }
+  /* Privatchat am Handy als schwebende Blase wie am PC */
+  .dm-sheet.sheet-wrap { align-items: center; padding: calc(var(--safe-t) + 10px) 10px calc(var(--safe-b) + 10px); }
+  .dm-sheet .sheet { height: 100%; max-height: none; border-radius: 28px; padding-bottom: 0; }
+  .dm-sheet .sheet-body { padding-bottom: 12px; }
+}
