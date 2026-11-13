@@ -1710,6 +1710,9 @@ const VIEWS = {
 
       ${polls.length ? `<h2 class="section-title">Deine Stimme fehlt <button class="link" data-act="goto-feed" data-v="poll">Umfragen</button></h2>${polls.map((p) => postCard(p, true)).join('')}` : ''}
 
+      <h2 class="section-title">Social Hub <button class="link" data-act="tab" data-v="board">Alle</button></h2>
+      ${posts.length ? posts.map((p) => postCard(p)).join('') : `<button class="card compose-prompt" data-act="compose" data-v="post">${avatar(state.me, 36)}<span class="fake-input">Schreib etwas an alle …</span></button>`}
+
       <h2 class="section-title">Demnächst <button class="link" data-act="goto-feed" data-v="event">Ereignisse</button></h2>
       ${events.length ? `<div class="list card tight">${events.map((p) => `
         <button class="list-item" data-act="goto-feed" data-v="event">
@@ -1720,9 +1723,6 @@ const VIEWS = {
         : `<div class="card empty"><div class="big">📅</div>Nichts geplant. <button class="link" style="color:var(--accent);font-weight:650" data-act="compose" data-v="event">Ereignis erstellen</button></div>`}
 
       ${fbTile()}
-
-      <h2 class="section-title">Social Hub <button class="link" data-act="tab" data-v="board">Alle</button></h2>
-      ${posts.length ? posts.map((p) => postCard(p)).join('') : `<button class="card compose-prompt" data-act="compose" data-v="post">${avatar(state.me, 36)}<span class="fake-input">Schreib etwas an alle …</span></button>`}
       </div></div>`;
   },
 
