@@ -63,7 +63,7 @@ export const DEFAULT_PREFS = { enabled: true, trash: true, dayBefore: true, hour
 export const EVENT_TYPES = [
   ['task_new', '📝 Neue Aufgaben'],
   ['task_done', '✅ Erledigte Aufgaben'],
-  ['post_new', '📌 Neue Beiträge auf der Pinnwand'],
+  ['post_new', '📌 Neue Beiträge im Social Hub'],
   ['social', '❤️ Likes, Kommentare & Reaktionen auf meine Beiträge'],
   ['bin_done', '🗑️ Tonne wurde rausgestellt'],
   ['mention', '🏷️ Wenn mich jemand markiert'],

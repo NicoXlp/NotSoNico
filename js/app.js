@@ -129,7 +129,7 @@ const TABS = [
   { id: 'home', label: 'Übersicht', icon: I.home },
   { id: 'tasks', label: 'Aufgaben', icon: I.tasks },
   { id: 'trash', label: 'Müll', icon: I.trash },
-  { id: 'board', label: 'Pinnwand', icon: I.board },
+  { id: 'board', label: 'Social Hub', icon: I.board },
   { id: 'house', label: 'Haus', icon: I.people },
 ];
 const MEMBER_EMOJIS = ['😀', '😎', '🥰', '🤓', '🦊', '🐼', '🐨', '🦁', '🐸', '🐙', '🦄', '🐝', '🐱', '🐶', '🌻', '🌈', '⭐', '🍕', '☕', '🎸', '👑', '💜', '🌸', '🍀'];
@@ -663,7 +663,7 @@ function onFab() {
     title: 'Neu erstellen',
     html: `<div class="menu-list">
       <button data-new="task">${I.tasks}<span>Aufgabe<span class="desc">Was muss erledigt werden?</span></span></button>
-      <button data-new="post">${I.board}<span>Beitrag<span class="desc">Etwas an die Pinnwand schreiben</span></span></button>
+      <button data-new="post">${I.board}<span>Beitrag<span class="desc">Etwas im Social Hub posten</span></span></button>
       <button data-new="photo">${I.photo}<span>Foto / Video<span class="desc">Bilder und Clips mit allen teilen</span></span></button>
       <button data-new="voice">${I.mic}<span>Sprachnachricht<span class="desc">Einfach draufsprechen</span></span></button>
       <button data-new="poll">${I.chart}<span>Umfrage<span class="desc">Alle abstimmen lassen</span></span></button>
@@ -859,7 +859,7 @@ function binWhoHtml(p, { size = 18, short = false } = {}) {
   return `<span class="av-stack">${all.slice(0, 5).map((id) => avatar(id, size)).join('')}</span> ${short ? '' : label}`;
 }
 
-/* ─── Pinnwand-Logik ─────────────────────────────────────────────────────── */
+/* ─── Social Hub-Logik ─────────────────────────────────────────────────────── */
 const feedSorted = () => [...state.feed].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (b.createdAt || 0) - (a.createdAt || 0));
 const upcomingEvents = () => state.feed.filter((p) => p.type === 'event' && p.event?.date >= today())
   .sort((a, b) => (a.event.date + (a.event.time || '')).localeCompare(b.event.date + (b.event.time || '')));
@@ -1357,7 +1357,7 @@ const VIEWS = {
         </button>`).join('')}</div>`
         : `<div class="card empty"><div class="big">📅</div>Nichts geplant. <button class="link" style="color:var(--accent);font-weight:650" data-act="compose" data-v="event">Ereignis erstellen</button></div>`}
 
-      <h2 class="section-title">Pinnwand <button class="link" data-act="tab" data-v="board">Alle</button></h2>
+      <h2 class="section-title">Social Hub <button class="link" data-act="tab" data-v="board">Alle</button></h2>
       ${posts.length ? posts.map((p) => postCard(p)).join('') : `<button class="card compose-prompt" data-act="compose" data-v="post">${avatar(state.me, 36)}<span class="fake-input">Schreib etwas an alle …</span></button>`}
       </div></div>`;
   },
@@ -1474,7 +1474,7 @@ const VIEWS = {
   board() {
     let list = feedSorted();
     if (state.feedFilter !== 'all') list = list.filter((p) => p.type === state.feedFilter || (state.feedFilter === 'post' && p.type === 'voice'));
-    return `${header(state.house?.name || 'Hausgemeinschaft', 'Pinnwand')}
+    return `${header(state.house?.name || 'Hausgemeinschaft', 'Social Hub')}
       ${segmented([['all', 'Alle'], ['post', 'Beiträge'], ['poll', 'Umfragen'], ['event', 'Ereignisse']], state.feedFilter, 'feed-filter')}
       <div class="card compose-prompt" style="margin-bottom:12px">
         ${avatar(state.me, 36)}
@@ -1525,7 +1525,7 @@ const VIEWS = {
 
       <h2 class="section-title">Daten</h2>
       <div class="menu-list">
-        <button data-act="notify">${I.bell}<span>Mitteilungen<span class="desc">${notifyPrefs().enabled ? 'An – Aufgaben, Pinnwand, Müll' : 'Aus'}</span></span></button>
+        <button data-act="notify">${I.bell}<span>Mitteilungen<span class="desc">${notifyPrefs().enabled ? 'An – Aufgaben, Social Hub, Müll' : 'Aus'}</span></span></button>
         <button data-act="cloud">${I.cloud}<span>Synchronisierung<span class="desc">${esc(mode)}</span></span></button>
         <button data-act="house-rename">${I.pen}<span>Haus umbenennen</span></button>
         <button data-act="export">${I.download}<span>Backup herunterladen<span class="desc">Alle Daten als JSON-Datei</span></span></button>
@@ -1799,7 +1799,7 @@ function icsExport() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Sheets: Pinnwand
+   Sheets: Social Hub
    ═══════════════════════════════════════════════════════════════════════════ */
 function composeSheet(type = 'post', existing = null, preset = {}) {
   const p = existing;
@@ -1815,7 +1815,7 @@ function composeSheet(type = 'post', existing = null, preset = {}) {
 
   let recorder = null;
   openSheet({
-    title: p ? 'Bearbeiten' : 'Neu an der Pinnwand',
+    title: p ? 'Bearbeiten' : 'Neu im Social Hub',
     onClose: () => recorder?.cleanup(),
     html: `<form id="f">
       ${p ? '' : segmented([['post', '💬 Text'], ['voice', '🎤 Sprache'], ['poll', '📊 Umfrage'], ['event', '📅 Termin']], kind, 'noop')}
@@ -2848,7 +2848,7 @@ function showWelcome() {
   $('#view').innerHTML = `<div class="welcome"><div class="card center">
     ${LOGO}
     <h1>Vermietertagebuch</h1>
-    <p class="muted" style="margin:0 0 22px">Aufgaben, Müllabfuhr, Pinnwand, Umfragen & Ereignisse – für eure ganze Hausgemeinschaft.</p>
+    <p class="muted" style="margin:0 0 22px">Aufgaben, Müllabfuhr, Social Hub, Umfragen & Ereignisse – für eure ganze Hausgemeinschaft.</p>
     <form id="new" style="text-align:left">
       <div class="field"><label for="w-name">Wie heißt euer Haus?</label><input id="w-name" maxlength="40" placeholder="z. B. Villa Kunterbunt" required></div>
       <button class="btn primary block">${I.sparkle}Neues Haus anlegen</button>
