@@ -14,7 +14,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg?v=3" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=3">
-  <link rel="stylesheet" href="css/style.css?v=71">
+  <link rel="stylesheet" href="css/style.css?v=72">
 </head>
 <body>
   <!-- Startanimation: Kalender-Tagebuch (steht direkt im HTML, damit sie sofort erscheint) -->
@@ -36,6 +36,7 @@
     (function () {
       try {
         var d = new Date(), y = new Date(d.getTime() - 864e5);
+        document.documentElement.classList.add('splashing');
         document.getElementById('sp-month').textContent = d.toLocaleDateString('de-DE', { month: 'long' });
         document.getElementById('sp-wd').textContent = d.toLocaleDateString('de-DE', { weekday: 'long' });
         document.getElementById('sp-today').textContent = d.getDate();
@@ -77,6 +78,6 @@
 
   <div id="toasts" aria-live="polite"></div>
 
-  <script type="module" src="js/app.js?v=71"></script>
+  <script type="module" src="js/app.js?v=72"></script>
 </body>
 </html>

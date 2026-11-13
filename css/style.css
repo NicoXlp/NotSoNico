@@ -1603,3 +1603,26 @@ html, body { min-height: 100%; }
   white-space: pre; font: 600 10px/1.35 ui-monospace, Menlo, monospace; color: #fff;
   background: rgba(0, 0, 0, .72); padding: 5px 7px; border-radius: 8px; max-width: calc(100vw - 12px); overflow: hidden;
 }
+
+/* ─── Startanimation: flüssig auf allen Geräten (v. a. iPad/Safari) ───
+   • Farbflecken als weiche Verläufe statt riesiger Weichzeichner (Safari zeigte sonst Kanten/Kacheln)
+   • kein Glas-Weichzeichner und kein animierter Blur auf der Karte
+   • nur transform/opacity animieren, eigene Ebenen für die bewegten Teile
+   • App dahinter wird erst gezeichnet, wenn die Animation ausblendet */
+html.splashing #app, html.splashing .dock, html.splashing .backdrop, html.splashing #toasts { visibility: hidden; }
+.splash { contain: strict; isolation: isolate; transform: translateZ(0); }
+.sp-blob {
+  filter: none; opacity: .9; border-radius: 0;
+  will-change: opacity, transform; backface-visibility: hidden;
+}
+.sp-b1 { background: radial-gradient(closest-side, var(--sp-b1, var(--blob-1)), transparent); }
+.sp-b2 { background: radial-gradient(closest-side, var(--sp-b2, var(--blob-2)), transparent); }
+.sp-b3 { background: radial-gradient(closest-side, var(--sp-b3, var(--blob-3)), transparent); opacity: .7; }
+.sp-card {
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+  background: color-mix(in srgb, var(--glass-bg-strong) 55%, var(--bg));
+  will-change: transform, opacity; backface-visibility: hidden;
+}
+@keyframes spCardIn { from { opacity: 0; transform: translateY(18px) scale(.9); } }
+.sp-old, .sp-today, .sp-check, .sp-rings i, .sp-lines i { will-change: transform, opacity; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.splash.out .sp-card { transition: none; }

@@ -4105,9 +4105,14 @@ const pending = { tab: null, done: null };
 /* ─── Startanimation ─────────────────────────────────────────────────────── */
 function hideSplash(now = false) {
   const el = document.getElementById('splash');
-  if (!el || el.classList.contains('out')) return;
+  if (!el) { document.documentElement.classList.remove('splashing'); return; }
+  if (el.classList.contains('out')) return;
   const min = matchMedia('(prefers-reduced-motion: reduce)').matches ? 400 : 2300; // ab Seitenstart gezählt
-  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 500); }, now ? 0 : Math.max(0, min - performance.now()));
+  setTimeout(() => {
+    document.documentElement.classList.remove('splashing'); // App darunter wieder zeichnen, dann ausblenden
+    requestAnimationFrame(() => el.classList.add('out'));
+    setTimeout(() => el.remove(), 560);
+  }, now ? 0 : Math.max(0, min - performance.now()));
 }
 document.getElementById('splash')?.addEventListener('click', () => hideSplash(true));
 setTimeout(() => hideSplash(true), 7000); // Sicherheitsnetz
