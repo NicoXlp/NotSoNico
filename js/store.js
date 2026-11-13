@@ -38,7 +38,8 @@ class LocalStore {
   }
   _col(c) { return (this.data[c] ||= {}); }
   _emit(c) { const list = Object.values(this._col(c)).map((x) => ({ ...x })); (this.subs[c] || []).forEach((f) => f(list)); }
-  subscribe(c, f) {
+  subscribe(c, f0, filter) {
+    const f = filter ? (l, m) => f0(l.filter((x) => (x[filter.field] || []).includes(filter.contains)), m) : f0;
     (this.subs[c] ||= []).push(f);
     queueMicrotask(() => f(Object.values(this._col(c)).map((x) => ({ ...x }))));
     return () => { this.subs[c] = this.subs[c].filter((x) => x !== f); };
@@ -83,8 +84,10 @@ class CloudStore {
   async idToken() { return this.auth?.currentUser?.getIdToken(); }
   _c(c) { return this.fs.collection(this.db, 'households', this.hid, c); }
   _d(c, id) { return this.fs.doc(this.db, 'households', this.hid, c, id); }
-  subscribe(c, f) {
-    return this.fs.onSnapshot(this._c(c), { includeMetadataChanges: true },
+  /** filter = { field, contains }: nur Dokumente, deren Liste `field` den Wert enthält */
+  subscribe(c, f, filter) {
+    const src = filter ? this.fs.query(this._c(c), this.fs.where(filter.field, 'array-contains', filter.contains)) : this._c(c);
+    return this.fs.onSnapshot(src, { includeMetadataChanges: true },
       (snap) => f(snap.docs.map((d) => ({ ...d.data(), id: d.id })), { fromCache: snap.metadata.fromCache }),
       (err) => console.error('Snapshot-Fehler', c, err));
   }
