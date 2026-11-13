@@ -1553,3 +1553,7 @@ html.sheet-open, html.sheet-open body { overflow: hidden; overscroll-behavior: n
 /* @everyone */
 .mention.all { background: color-mix(in srgb, var(--warning) 22%, transparent); color: inherit; font-weight: 700; }
 .everyone-av { background: color-mix(in srgb, var(--warning) 30%, var(--fill)); font-size: 14px; }
+
+/* Kein Leerraum unter der App, falls iOS die Seite nach der Tastatur verschiebt */
+html, body { min-height: 100%; }
+html { background: var(--bg); }
