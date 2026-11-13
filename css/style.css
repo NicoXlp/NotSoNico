@@ -1411,3 +1411,84 @@ html.sheet-open, html.sheet-open body { overflow: hidden; overscroll-behavior: n
 .profile-view .av { margin-bottom: 6px; }
 .pv-name { font-size: 22px; font-weight: 750; letter-spacing: -.01em; }
 .btn.danger-soft { margin-top: 18px; background: transparent; box-shadow: none; color: var(--danger); font-weight: 600; }
+
+/* ═══ Faltbare Handys (Galaxy Fold/Flip, Surface Duo …) & sehr kleine Displays ═══ */
+.section-title { flex-wrap: wrap; gap: 4px 12px; }
+.banner button { margin-left: auto; }
+
+/* Aufgeklappte Foldables (fast quadratisch): Startseite schon zweispaltig */
+@media (min-width: 720px) {
+  .view { max-width: 980px; }
+  .home-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 0 22px; align-items: start; }
+}
+
+/* Sehr schmal (z. B. Außendisplay älterer Galaxy Folds, ~280 px) */
+@media (max-width: 340px) {
+  .view { padding-left: 10px; padding-right: 10px; }
+  .chips { margin-left: -10px; margin-right: -10px; padding-left: 10px; padding-right: 10px; }
+  .top { gap: 8px; }
+  .top h1 { font-size: 24px; }
+  .eyebrow { font-size: 11px; }
+  .top-actions { gap: 5px; }
+  .top-actions .add-btn { width: 34px; height: 34px; }
+  .top-actions .add-btn svg { width: 18px; height: 18px; }
+  .top .me-btn .av { --s: 34px !important; }
+  .section-title { font-size: 18px; margin-top: 22px; }
+  .banner { flex-wrap: wrap; }
+  .kpis { gap: 6px; }
+  .kpi .l { font-size: 11px; }
+  .dock { width: calc(100% - 16px); }
+  .sheet-body { padding-left: 12px; padding-right: 12px; }
+  .dm-emo { grid-template-columns: repeat(6, 31px); }
+  .dm-emo button { width: 31px; height: 31px; font-size: 18px; }
+  .dm-bar .dm-tool { width: 34px; height: 34px; }
+}
+
+/* Niedrige Displays (z. B. Außendisplay Galaxy Z Flip) */
+@media (max-height: 540px) and (max-width: 600px) {
+  .view { padding-top: calc(var(--safe-t) + 6px); padding-bottom: calc(var(--safe-b) + 74px); }
+  .top { margin: 4px 4px 12px; }
+  .top h1 { font-size: 24px; }
+  .eyebrow { font-size: 11px; margin-bottom: 2px; }
+  .section-title { margin-top: 18px; font-size: 18px; }
+  .dock { bottom: max(8px, calc(var(--safe-b) + 2px)); }
+  .tabbar { height: 50px; }
+  .tab svg { width: 20px; height: 20px; }
+  .sheet { max-height: calc(100dvh - var(--safe-t) - 8px); }
+  .dm-sheet.sheet-wrap { padding: calc(var(--safe-t) + 4px) 6px calc(var(--safe-b) + 4px); }
+  .sp-card { zoom: .78; }
+}
+
+/* Zwei Bildschirme nebeneinander (Surface Duo, aufgeklappt mit Scharnier):
+   links die App, rechts öffnen sich Chats & Fenster – nichts liegt im Scharnier */
+@media (horizontal-viewport-segments: 2) {
+  .view { width: env(viewport-segment-width 0 0); max-width: none; margin: 0; }
+  .home-grid { display: block; }
+  .dock { left: calc(env(viewport-segment-width 0 0) / 2); width: min(env(viewport-segment-width 0 0) - 24px, 520px); }
+  .sheet-wrap, .dm-sheet.sheet-wrap { left: env(viewport-segment-left 1 0); align-items: center; padding: calc(var(--safe-t) + 12px) 12px calc(var(--safe-b) + 12px); }
+  .sheet { border-radius: 28px; max-height: 100%; }
+  .dm-sheet .sheet { height: 100%; }
+  #toasts { left: calc(env(viewport-segment-width 0 0) / 2); width: min(env(viewport-segment-width 0 0) - 24px, 420px); }
+}
+
+/* Zwei Bildschirme übereinander (halb aufgeklappt, z. B. Flex-Modus):
+   oben lesen, Navigation unten – nichts liegt im Knick */
+@media (vertical-viewport-segments: 2) {
+  .view { padding-bottom: calc(env(viewport-segment-height 0 1) + 30px); }
+  .dock { bottom: auto; top: calc(env(viewport-segment-top 0 1) + (env(viewport-segment-height 0 1) - 58px) / 2); }
+  .sheet-wrap, .dm-sheet.sheet-wrap { align-items: flex-start; padding: calc(var(--safe-t) + 8px) 10px calc(100dvh - env(viewport-segment-bottom 0 0) + 8px); }
+  .sheet { border-radius: 28px; max-height: 100%; }
+  .dm-sheet .sheet { height: 100%; }
+}
+@media (max-width: 300px) {
+  .tabbar { height: 52px; }
+  .tab span { display: none; }            /* nur Symbole – Beschriftungen passen nicht mehr */
+  .tab svg { width: 24px; height: 24px; }
+}
+@media (max-width: 340px) {
+  .banner > :not(svg):not(button) { flex: 1 1 calc(100% - 40px); }
+  .news-head { flex-wrap: wrap; }
+  .news-head .small { display: none; }
+}
+.banner-txt { flex: 1; }
+@media (max-width: 340px) { .banner .banner-txt { flex: 1 1 calc(100% - 40px); } }
