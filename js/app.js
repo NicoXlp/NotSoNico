@@ -1,3 +1,4 @@
+import './compat.js';
 import { createStore, newId, COLLECTIONS, readLocal } from './store.js';
 import { parseICS, buildICS } from './ics.js';
 import { FIREBASE_CONFIG, VAPID_PUBLIC_KEY } from './config.js';
