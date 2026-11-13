@@ -1005,3 +1005,9 @@ img.blur { filter: blur(14px) saturate(1.2); transform: scale(1.08); }
 .presence.on { color: var(--success); font-weight: 650; }
 .presence.on::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 5px; vertical-align: 1px; }
 .presence.off { font-style: italic; }
+
+/* Schnellauswahl beim Anlegen einer Tonne */
+.dot-c { width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 1px rgba(255,255,255,.5); display: inline-block; }
+.cal-day { cursor: pointer; transition: background .2s, transform .25s var(--spring); }
+.cal-day:active { background: var(--fill); transform: scale(.92); }
+.cal-day.today:active { background: var(--accent); }

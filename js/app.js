@@ -136,6 +136,9 @@ const BIN_COLORS = [
   ['Grau', '#6b7280'], ['Schwarz', '#2c2c30'], ['Braun', '#8b5a2b'], ['Blau', '#2f7de1'],
   ['Gelb', '#eab308'], ['Grün', '#2fa84f'], ['Rot', '#e5484d'], ['Orange', '#f08c2e'], ['Lila', '#8e5cf7'],
 ];
+const BIN_PRESETS = [
+  ['Restmüll', '#6b7280'], ['Biotonne', '#8b5a2b'], ['Papier', '#2f7de1'], ['Gelber Sack', '#eab308'], ['Glas', '#2fa84f'], ['Sperrmüll', '#e5484d'],
+];
 const DEFAULT_BINS = [
   { name: 'Restmüll', color: '#6b7280' },
   { name: 'Biotonne', color: '#8b5a2b' },
@@ -684,6 +687,15 @@ function taskRow(t) {
 
 /* ─── Müll-Logik ─────────────────────────────────────────────────────────── */
 const memberIds = () => membersSorted().map((m) => m.id);
+/** Früher automatisch angelegte Beispiel-Tonnen ohne echte Termine still entfernen */
+let exampleCleanupDone = false;
+function removeExampleBins() {
+  if (exampleCleanupDone) return;
+  const ex = exampleBins();
+  if (!ex.length) return;
+  exampleCleanupDone = true;
+  ex.forEach((b) => removeDoc('trash', b.id));
+}
 /** Die früher per „Standard-Tonnen anlegen“ erzeugten, nie angepassten Beispiel-Tonnen */
 function exampleBins() {
   const names = DEFAULT_BINS.map((b) => b.name);
@@ -1313,21 +1325,20 @@ const VIEWS = {
       const ps = calPick.filter((p) => p.date === d);
       const ev = calEv.filter((p) => p.event?.date === d);
       const dots = [...ps.map((p) => p.bin.color), ...ev.map(() => '#ff3b30')].slice(0, 4);
-      cells.push(`<div class="cal-day ${d.slice(0, 7) !== cm ? 'out' : ''} ${d === from ? 'today' : ''} ${dots.length ? 'has' : ''}" ${dots.length ? `data-act="cal-day" data-v="${d}"` : ''}>
+      cells.push(`<div class="cal-day ${d.slice(0, 7) !== cm ? 'out' : ''} ${d === from ? 'today' : ''} ${dots.length ? 'has' : ''}" data-act="cal-day" data-v="${d}" role="button" aria-label="${esc(fmtLong(d))}">
         <span>${parseISO(d).getDate()}</span><span class="dots">${dots.map((c) => `<i style="--c:${esc(c)}"></i>`).join('')}</span></div>`);
     }
     const monthName = new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' }).format(first);
 
     return `${header('Abholplan', 'Müllabfuhr')}
       ${state.trash.length ? segmented([['mine', 'Für mich'], ['all', 'Ganzes Haus']], scope, 'bin-scope') : ''}
-      ${exampleBins().length ? `<div class="banner"><span style="font-size:20px">💡</span><span style="flex:1">Das sind <b>Beispiel-Tonnen</b> mit erfundenen Terminen. Am besten entfernen und eure echten Tonnen anlegen oder den Abfallkalender hochladen.</span><button data-act="bins-examples-del">Entfernen</button></div>` : ''}
       ${notifyCard()}
       ${state.trash.length ? '' : `<div class="card empty"><div class="big">🗑️</div><h3>Noch keine Tonnen</h3><p class="muted" style="margin-bottom:14px">Lade den Abfallkalender eurer Stadt hoch (.ics) oder lege eure Tonnen von Hand an.</p>
         <div class="row wrap" style="justify-content:center"><button class="btn sm primary" data-act="ics-import">${I.upload}Abfallkalender hochladen</button><button class="btn sm" data-act="bin-new">${I.plus}Tonne anlegen</button></div></div>`}
 
       ${state.trash.length ? `<h2 class="section-title">Die nächsten 6 Wochen</h2>
       ${Object.keys(byDate).length ? Object.entries(byDate).map(([d, ps]) => `
-        <div class="group-label">${esc(fmtDay(d))}${daysBetween(from, d) > 1 ? ` · ${fmt(d, { day: 'numeric', month: 'long' })}` : ''}</div>
+        <div class="group-label">${esc(fmtDay(d))}${daysBetween(from, d) > 1 && daysBetween(from, d) < 7 ? ` · ${fmt(d, { day: 'numeric', month: 'long' })}` : ''}</div>
         <div class="list card tight">${ps.map((p) => `
           <div class="list-item">
             ${binIcon(p.bin)}
@@ -1336,7 +1347,7 @@ const VIEWS = {
           </div>
           <div class="confirm-row">${confirmBox(p)}</div>`).join('')}</div>`).join('') : `<div class="card empty">Keine Termine in den nächsten 6 Wochen.</div>`}` : ''}
 
-      ${state.trash.length ? `<h2 class="section-title">Kalender</h2>
+      <h2 class="section-title">Kalender <span class="small muted" style="font-weight:500">Tag antippen zum Anlegen</span></h2>
       <div class="card cal">
         <div class="cal-head">
           <button class="icon-btn" data-act="cal-move" data-v="-1" aria-label="Vorheriger Monat">${I.left}</button>
@@ -1346,7 +1357,7 @@ const VIEWS = {
         <div class="cal-grid">${['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((w) => `<div class="wd">${w}</div>`).join('')}${cells.join('')}</div>
       </div>
 
-      <h2 class="section-title">Tonnen <button class="link" data-act="bin-new">Hinzufügen</button></h2>
+      ${state.trash.length ? `<h2 class="section-title">Tonnen <button class="link" data-act="bin-new">Hinzufügen</button></h2>
       ${`<div class="list card tight">${[...state.trash].filter((b) => scope === 'all' || binAppliesTo(b, state.me)).sort((a, b) => a.name.localeCompare(b.name)).map((b) => `
         <button class="list-item" data-act="bin-edit" data-id="${b.id}">
           ${binIcon(b)}
@@ -1490,9 +1501,9 @@ function taskSheet(id) {
 /* ═══════════════════════════════════════════════════════════════════════════
    Sheets: Müll
    ═══════════════════════════════════════════════════════════════════════════ */
-function binSheet(id) {
+function binSheet(id, preset = {}) {
   const b = id ? state.trash.find((x) => x.id === id) : null;
-  const v = b || { name: '', color: '#6b7280', mode: 'interval', start: today(), interval: 2, dates: [], rotation: membersSorted().map((m) => m.id) };
+  const v = b || { name: '', color: '#6b7280', mode: 'interval', start: preset.start || today(), interval: 2, dates: preset.start ? [preset.start] : [], rotation: membersSorted().map((m) => m.id) };
   let rotation = [...(v.rotation || [])].filter(member);
   let dates = [...(v.dates || [])].sort();
   let color = v.color;
@@ -1516,6 +1527,7 @@ function binSheet(id) {
   openSheet({
     title: b ? 'Tonne bearbeiten' : 'Neue Tonne',
     html: `<form id="f">
+      ${b ? '' : `<div class="row wrap" style="gap:6px;margin-bottom:12px">${BIN_PRESETS.map(([n, c]) => `<button type="button" class="chip chip-glass no-av" data-preset="${esc(n)}" data-pc="${c}"><span class="dot-c" style="--c:${c}"></span>${esc(n)}</button>`).join('')}</div>`}
       <div class="field"><label for="b-name">Name</label><input id="b-name" required maxlength="40" placeholder="z. B. Biotonne" value="${esc(v.name)}" autofocus></div>
       <div class="field"><span class="label">Farbe</span><div class="swatches" id="sw">${BIN_COLORS.map(([n, c]) => `<button type="button" class="swatch ${c === color ? 'on' : ''}" style="--c:${c}" data-c="${c}" aria-label="${n}"></button>`).join('')}</div></div>
       <div class="field"><span class="label">Gilt für (bekommt Erinnerungen)</span><div class="for-wrap">${forPicker(forMembers)}</div></div>
@@ -1542,6 +1554,14 @@ function binSheet(id) {
       let mode = v.mode || 'interval';
       bindForPicker(f, () => forMembers, (x) => { forMembers = x; });
       f.addEventListener('click', (e) => {
+        const pre = e.target.closest('[data-preset]');
+        if (pre) {
+          $('#b-name', f).value = pre.dataset.preset;
+          color = pre.dataset.pc;
+          $$('.swatch', f).forEach((x) => x.classList.toggle('on', x.dataset.c === color));
+          $$('[data-preset]', f).forEach((x) => x.classList.toggle('on', x === pre));
+          return;
+        }
         const sw = e.target.closest('[data-c]');
         if (sw) { color = sw.dataset.c; $$('.swatch', f).forEach((x) => x.classList.toggle('on', x === sw)); }
         const seg = e.target.closest('.seg button');
@@ -1679,7 +1699,7 @@ function icsExport() {
 /* ═══════════════════════════════════════════════════════════════════════════
    Sheets: Pinnwand
    ═══════════════════════════════════════════════════════════════════════════ */
-function composeSheet(type = 'post', existing = null) {
+function composeSheet(type = 'post', existing = null, preset = {}) {
   const p = existing;
   const pickPhotos = type === 'photo';
   if (pickPhotos) type = 'post';
@@ -1689,7 +1709,7 @@ function composeSheet(type = 'post', existing = null) {
   let processing = 0;
   let opts = p?.poll?.options?.map((o) => o.text) || ['', ''];
   const optsHtml = () => opts.map((o, i) => `<div class="row" style="margin-bottom:8px"><input class="input" data-opt="${i}" maxlength="80" placeholder="Option ${i + 1}" value="${esc(o)}">${opts.length > 2 ? `<button type="button" class="icon-btn" data-opt-del="${i}" aria-label="Entfernen">${I.close}</button>` : ''}</div>`).join('');
-  const e = p?.event || { title: '', date: addDays(today(), 1), time: '', endTime: '', location: '', desc: '' };
+  const e = p?.event || { title: '', date: preset.date || addDays(today(), 1), time: '', endTime: '', location: '', desc: '' };
 
   let recorder = null;
   openSheet({
@@ -2460,12 +2480,6 @@ const ACTIONS = {
   notify: () => notifySheet(),
   'bin-new': () => binSheet(),
   'bin-edit': (d) => binSheet(d.id),
-  'bins-examples-del': async () => {
-    const ex = exampleBins();
-    if (!ex.length || !(await confirmSheet(`Die ${ex.length} Beispiel-Tonnen (${ex.map((b) => b.name).join(', ')}) für alle entfernen?`, 'Entfernen'))) return;
-    ex.forEach((b) => removeDoc('trash', b.id));
-    toast('🧹 Beispiel-Tonnen entfernt');
-  },
   'ics-import': () => icsImport(),
   'ics-export': () => icsExport(),
   'cal-move': (d) => {
@@ -2478,10 +2492,25 @@ const ACTIONS = {
     const body = () => {
     const ps = pickups(d.v, d.v, state.binScope);
     const ev = state.feed.filter((p) => p.type === 'event' && p.event?.date === d.v);
+    if (!ps.length && !ev.length) return '<p class="muted center" style="margin:4px 0 0">An diesem Tag ist noch nichts eingetragen.</p>';
     return `<div class="list card tight">${ps.map((p) => `<div class="list-item">${binIcon(p.bin)}<div class="main"><div class="title">${esc(p.bin.name)}</div><div class="sub">${p.who ? `${esc(member(p.who)?.name)} ist dran` : ''}</div></div></div><div class="confirm-row">${confirmBox(p)}</div>`).join('')}
         ${ev.map((p) => `<div class="list-item"><span class="bin-icon" style="--c:#ff3b30">${I.cal}</span><div class="main"><div class="title">${esc(p.event.title)}</div><div class="sub">${p.event.time ? `${esc(p.event.time)} Uhr` : 'Ganztägig'}${p.event.location ? ` · ${esc(p.event.location)}` : ''}</div></div></div>`).join('')}</div>`;
     };
-    openSheet({ title: fmtLong(d.v), html: `<div id="cd">${body()}</div>`, refresh: (api) => { $('#cd', api.el).innerHTML = body(); } });
+    openSheet({
+      title: fmtLong(d.v),
+      html: `<div id="cd">${body()}</div>
+        <div class="menu-list" style="margin-top:12px">
+          <button data-day-act="bin">${I.trash}<span>Tonne ab diesem Tag anlegen<span class="desc">z. B. Restmüll alle 2 Wochen ab ${esc(fmt(d.v, { day: 'numeric', month: 'long' }))}</span></span></button>
+          <button data-day-act="event">${I.cal}<span>Ereignis an diesem Tag<span class="desc">Grillabend, Handwerker, Geburtstag …</span></span></button>
+        </div>`,
+      refresh: (api) => { $('#cd', api.el).innerHTML = body(); },
+      onMount: (api) => api.body.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-day-act]');
+        if (!b) return;
+        api.close();
+        setTimeout(() => (b.dataset.dayAct === 'bin' ? binSheet(null, { start: d.v }) : composeSheet('event', null, { date: d.v })), 150);
+      }),
+    });
   },
   'feed-filter': (d) => { state.feedFilter = d.v; renderNow(false); },
   compose: (d) => composeSheet(d.v),
@@ -2695,6 +2724,7 @@ async function connect(hid, { create } = {}) {
     store.subscribe(col, (list) => {
       state[col] = list;
       state.loaded.add(col);
+      if (col === 'trash') removeExampleBins();
       if (col === 'members' && state.ready && (!state.me || !member(state.me)) && !sheets.some((s) => s.el.querySelector('#mf'))) whoAreYou();
       render();
     });
