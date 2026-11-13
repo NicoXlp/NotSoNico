@@ -1681,6 +1681,11 @@ const VIEWS = {
       <div class="label" style="margin:14px 6px 8px">Farbschema</div>
       ${paletteHtml()}
 
+      <h2 class="section-title">Wünsche & Bugs</h2>
+      <div class="field" style="margin-bottom:6px"><label for="fb-owner">Meldungen werden zugestellt an</label>
+        <select id="fb-owner">${membersSorted().map((m) => `<option value="${m.id}" ${m.id === fbOwner() ? 'selected' : ''}>${esc(m.emoji || '')} ${esc(dn(m.id))}${m.id === state.me ? ' (du)' : ''}</option>`).join('')}</select></div>
+      <p class="small muted" style="margin:0 6px">Neue Bugs & Wünsche kommen bei dieser Person als Privatnachricht und Mitteilung an. Wer etwas gemeldet hat, erfährt, wenn sich der Status ändert.</p>
+
       <h2 class="section-title">Privatsphäre</h2>
       ${toggle('pres-on', '🟢 Online-Status anzeigen', !presenceHidden())}
       <p class="small muted" style="margin:-4px 6px 0">Wenn aus, sehen die anderen nicht, ob du gerade online bist oder wann du zuletzt da warst. Gilt für alle deine Geräte.</p>
@@ -1755,6 +1760,7 @@ function dmPreview(m) {
   if (m.voice) return `${who}🎤 Sprachnachricht (${fmtDur(m.voice.duration)})`;
   if (m.media?.length) return `${who}${m.media.every((x) => x.kind === 'video') ? '🎬 Video' : '📷 Foto'}${m.media.length > 1 ? ` (${m.media.length})` : ''}${m.text ? ` · ${snippet(m.text, 40)}` : ''}`;
   if (m.taskId) return `${who}📋 ${state.tasks.find((t) => t.id === m.taskId)?.title || 'Aufgabe'}`;
+  if (m.feedbackId) { const f = state.feedback.find((x) => x.id === m.feedbackId); return `${who}${f?.kind === 'bug' ? '🐞 Bug' : '💡 Wunsch'}: ${f?.title || 'gelöscht'}`; }
   return who + snippet(m.text, 60);
 }
 function sendDm(to, data, { push = true, pushBody = null } = {}) {
@@ -1775,6 +1781,19 @@ function dmTaskCard(m) {
     <button class="main" data-act="task-edit" data-id="${t.id}"><div class="eyebrow-s">📋 Aufgabe</div><div class="title">${esc(t.title)}</div><div class="sub">${status}</div></button>
   </div>`;
 }
+function dmFeedbackCard(m) {
+  const f = state.feedback.find((x) => x.id === m.feedbackId);
+  if (!f) return '<div class="small muted">💬 Meldung wurde gelöscht</div>';
+  const [ico, label] = FB_KIND[f.kind] || FB_KIND.wish;
+  const [stTxt, stCls] = FB_STATUS[f.status] || FB_STATUS.open;
+  return `<button class="dm-fb" data-act="fb-open" data-id="${f.id}">
+    <div class="eyebrow-s">${ico} ${f.kind === 'bug' ? 'Bug-Meldung' : 'Neuer Wunsch'}</div>
+    <div class="title">${esc(f.title)}</div>
+    ${f.text ? `<div class="fb-text">${esc(f.text)}</div>` : ''}
+    <div class="sub"><span class="pill ${stCls}">${stTxt}</span>${(f.votes || []).length > 1 ? `<span>👍 ${(f.votes || []).length}</span>` : ''}<span class="dm-fb-go">Öffnen ›</span></div>
+  </button>`;
+}
+
 function dmMessagesHtml(id, ui = {}) {
   const list = dmWith(id);
   if (!list.length) {
@@ -1788,9 +1807,10 @@ function dmMessagesHtml(id, ui = {}) {
     const d = iso(new Date(m.createdAt));
     const sep = d !== day ? `<div class="dm-day">${esc(fmtDay(d))}</div>` : '';
     day = d;
-    const kind = m.voice ? 'bare' : m.taskId ? 'rich' : m.media?.length ? 'media' : '';
+    const kind = m.voice ? 'bare' : m.taskId || m.feedbackId ? 'rich' : m.media?.length ? 'media' : '';
     const cap = m.text ? `<div class="txt">${richText(m.text)}</div>` : '';
     const body = m.voice ? voiceBody(m)
+      : m.feedbackId ? dmFeedbackCard(m)
       : m.taskId ? dmTaskCard(m) + cap
         : m.media?.length ? mediaGrid({ ...m, text: '' }) + cap
           : richText(m.text);
@@ -2158,6 +2178,12 @@ function dmListSheet() {
    Eintrag: { kind: 'bug'|'wish', title, text, author, createdAt, votes: [ids], status: 'open'|'doing'|'done' }
    ═══════════════════════════════════════════════════════════════════════════ */
 const FB_KIND = { bug: ['🐞', 'Bug'], wish: ['💡', 'Wunsch'] };
+/** Wer bekommt Wünsche & Bug-Meldungen? Einstellbar unter „Haus“, sonst Nico bzw. die erste Person im Haus */
+function fbOwner() {
+  const set = state.house?.feedbackTo;
+  if (set && member(set)) return set;
+  return (state.members.find((m) => /^nico\b/i.test(String(m.name || '').trim())) || membersSorted()[0])?.id || null;
+}
 const FB_STATUS = { open: ['Offen', ''], doing: ['In Arbeit', 'blue'], done: ['Erledigt', 'green'] };
 const fbSorted = () => [...state.feedback].sort((a, b) =>
   (a.status === 'done') - (b.status === 'done') || (b.votes?.length || 0) - (a.votes?.length || 0) || (b.createdAt || 0) - (a.createdAt || 0));
@@ -2230,10 +2256,20 @@ function fbSheet(kind = 'wish', id = null) {
         const title = $('#fb-title', form).value.trim();
         const text = $('#fb-text', form).value.trim();
         if (!title) return;
-        if (f) mutate('feedback', f.id, (x) => ({ ...x, kind: k, title, text, status, ...(status !== x.status ? { statusBy: state.me, statusAt: Date.now() } : {}) }));
-        else {
-          addDoc('feedback', { kind: k, title, text, author: state.me, createdAt: Date.now(), votes: [state.me], status: 'open' });
-          emit('feedback', { title: `${k === 'bug' ? '🐞 Bug gemeldet' : '💡 Neuer Wunsch'} von ${myName()}`, body: snippet(title, 140), tab: 'home' });
+        if (f) {
+          mutate('feedback', f.id, (x) => ({ ...x, kind: k, title, text, status, ...(status !== x.status ? { statusBy: state.me, statusAt: Date.now() } : {}) }));
+          // Statusänderung → die meldende Person erfährt es
+          if (status !== (f.status || 'open') && f.author !== state.me) {
+            const st = { open: '↩️ wieder offen', doing: '🛠️ in Arbeit', done: '✅ erledigt' }[status];
+            emit('feedback', { title: `${f.kind === 'bug' ? 'Dein Bug' : 'Dein Wunsch'} ist ${st}`, body: snippet(f.title, 140), to: [f.author], tab: 'home', tag: `fb-${f.id}` });
+          }
+        } else {
+          const fid = addDoc('feedback', { kind: k, title, text, author: state.me, createdAt: Date.now(), votes: [state.me], status: 'open' });
+          const owner = fbOwner();
+          if (owner && owner !== state.me) {
+            sendDm(owner, { feedbackId: fid }, { push: false });
+            emit('feedback', { title: `${k === 'bug' ? '🐞 Bug gemeldet' : '💡 Neuer Wunsch'} von ${myName()}`, body: snippet(title + (text ? ` – ${text}` : ''), 160), to: [owner], tab: `dm:${state.me}`, tag: `fb-${fid}` });
+          }
         }
         haptic(10);
         toast(f ? 'Gespeichert' : k === 'bug' ? '🐞 Danke fürs Melden!' : '💡 Danke für deinen Wunsch!');
@@ -3886,6 +3922,11 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pagehide', () => beat(false));
 setInterval(() => { if (!document.hidden) beat(true); if (state.ready && presenceChanged()) render(); }, 60000);
 document.addEventListener('change', (e) => { if (e.target.id === 'pres-on') setPresenceVisible(e.target.checked); });
+document.addEventListener('change', async (e) => {
+  if (e.target.id !== 'fb-owner') return;
+  state.house = { ...(state.house || {}), feedbackTo: e.target.value };
+  try { await store.setHouse(state.house); toast(`💡 Meldungen gehen jetzt an ${dn(e.target.value)}`); } catch { toast('⚠️ Konnte nicht speichern'); }
+});
 document.addEventListener('input', (e) => {
   if (e.target.id !== 'pal-custom') return;
   LS.set('accentCustom', e.target.value);
