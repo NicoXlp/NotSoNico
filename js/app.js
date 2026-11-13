@@ -85,6 +85,7 @@ const I = {
   tasks: svg('<rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/><path d="m8 12.2 2.6 2.6L16 9.4"/>'),
   trash: svg('<path d="M4 7h16"/><path d="M9.5 7V4.8c0-.4.4-.8.8-.8h3.4c.4 0 .8.4.8.8V7"/><path d="M6 7l1 12.2A2 2 0 0 0 9 21h6a2 2 0 0 0 2-1.8L18 7"/><path d="M10 11v6M14 11v6"/>'),
   board: svg('<path d="M20 15.5a2 2 0 0 1-2 2H8l-4.5 3.5V6a2 2 0 0 1 2-2H18a2 2 0 0 1 2 2Z"/><path d="M8 9h8M8 12.5h5"/>'),
+  reply: svg('<path d="M9.5 6 4 11.5 9.5 17"/><path d="M4.5 11.5H14a6 6 0 0 1 6 6V19"/>'),
   dm: svg('<path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3.5 20.5l1.4-4.8A8.5 8.5 0 1 1 21 11.5Z"/><path d="M8.5 11.5h.01M12.5 11.5h.01M16.5 11.5h.01" stroke-width="2.6"/>'),
   people: svg('<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.6"/><path d="M15.5 14.3A5 5 0 0 1 21 19"/>'),
   plus: svg('<path d="M12 5v14M5 12h14"/>', 2.6),
@@ -974,7 +975,7 @@ function mediaGrid(p) {
   }).join('')}</div>`;
 }
 function findMedia(id) {
-  for (const p of state.feed) for (const m of p.media || []) if (m.id === id) return m;
+  for (const p of [...state.feed, ...state.messages]) for (const m of p.media || []) if (m.id === id) return m;
   return null;
 }
 function hydrateOne(img) {
@@ -993,7 +994,7 @@ function hydrateMedia() {
 
 /** Vollbild-Ansicht für Fotos & Videos (wischen, Pfeiltasten, speichern) */
 function openViewer(postId, start = 0) {
-  const p = state.feed.find((x) => x.id === postId);
+  const p = state.feed.find((x) => x.id === postId) || state.messages.find((x) => x.id === postId);
   const items = p?.media || [];
   if (!items.length) return;
   let i = Math.min(start, items.length - 1);
@@ -1078,15 +1079,16 @@ function voiceBody(p) {
   return `${p.text ? `<div class="post-text" style="margin-bottom:10px">${richText(p.text)}</div>` : ''}
     <div class="voice" data-voice="${p.id}">
       <button class="play" data-act="voice-play" data-id="${p.id}" aria-label="Abspielen/Pause">${I.play}</button>
-      <div class="wave" data-act="voice-seek" data-id="${p.id}">${peaks.map((h) => `<i style="--h:${Math.max(0.12, h).toFixed(2)}"></i>`).join('')}</div>
+      <div class="wave" data-id="${p.id}" role="slider" aria-label="Spulen" tabindex="0">${peaks.map((h) => `<i style="--h:${Math.max(0.12, h).toFixed(2)}"></i>`).join('')}</div>
       <span class="dur">${fmtDur(v.duration)}</span>
     </div>
-    ${heard.length ? `<div class="small muted" style="margin-top:6px">🎧 Gehört von ${heard.map((id) => esc(nameOf(id))).join(', ')}</div>` : ''}`;
+    ${heard.length ? `<div class="small muted" style="margin-top:6px">🎧 Gehört von ${heard.map((id) => (id === state.me ? 'dir' : esc(nameOf(id)))).join(', ')}</div>` : ''}`;
 }
 
 function updateVoiceUI() {
   $$('[data-voice]').forEach((el) => {
     const id = el.dataset.voice;
+    if (scrub && el.contains(scrub.el)) return;
     const p = state.feed.find((x) => x.id === id) || state.messages.find((x) => x.id === id);
     const a = player.id === id ? player.audio : null;
     const playing = !!a && !a.paused;
@@ -1141,6 +1143,52 @@ async function playVoice(id, frac = null) {
     mutate(col, id, (x) => ({ ...x, voice: { ...x.voice, heard: [...new Set([...(x.voice.heard || []), state.me])] } }));
   }
 }
+
+/* Spulen: auf der Wellenform tippen oder ziehen (Finger/Maus), Pfeiltasten ±5 s */
+let scrub = null;
+const waveFrac = (el, x) => { const r = el.getBoundingClientRect(); return Math.max(0, Math.min(1, (x - r.left) / r.width)); };
+function voiceTotal(id) {
+  const p = state.feed.find((x) => x.id === id) || state.messages.find((x) => x.id === id);
+  const a = player.id === id ? player.audio : null;
+  return (a && isFinite(a.duration) && a.duration > 0 ? a.duration : p?.voice?.duration) || 1;
+}
+function showScrub(el, frac) {
+  const bars = $$('i', el);
+  const n = Math.round(frac * bars.length);
+  bars.forEach((b, i) => b.classList.toggle('on', i < n));
+  const dur = $('.dur', el.closest('.voice'));
+  if (dur) dur.textContent = fmtDur(frac * voiceTotal(el.dataset.id));
+}
+document.addEventListener('pointerdown', (e) => {
+  const w = e.target.closest('.wave[data-id]');
+  if (!w || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  scrub = { el: w, id: e.pointerId, frac: waveFrac(w, e.clientX) };
+  try { w.setPointerCapture(e.pointerId); } catch { /* egal */ }
+  w.classList.add('scrubbing');
+  showScrub(w, scrub.frac);
+});
+document.addEventListener('pointermove', (e) => {
+  if (!scrub || e.pointerId !== scrub.id) return;
+  scrub.frac = waveFrac(scrub.el, e.clientX);
+  showScrub(scrub.el, scrub.frac);
+});
+const endScrub = (e) => {
+  if (!scrub || e.pointerId !== scrub.id) return;
+  const { el, frac } = scrub;
+  scrub = null;
+  el.classList.remove('scrubbing');
+  if (e.type === 'pointerup') playVoice(el.dataset.id, frac);
+};
+document.addEventListener('pointerup', endScrub);
+document.addEventListener('pointercancel', endScrub);
+document.addEventListener('keydown', (e) => {
+  const w = e.target.closest?.('.wave[data-id]');
+  if (!w || !['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+  e.preventDefault();
+  const id = w.dataset.id, total = voiceTotal(id);
+  const cur = player.id === id && player.audio ? player.audio.currentTime : 0;
+  playVoice(id, Math.max(0, Math.min(1, (cur + (e.key === 'ArrowRight' ? 5 : -5)) / total)));
+});
 
 const blobToDataURL = (blob) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
 
@@ -1303,6 +1351,16 @@ function eventBody(p) {
    Neuen Eintrag oben einfügen → die Kachel zeigt immer den neuesten. */
 const NEWS = [
   {
+    id: '2026-11-13-fixes',
+    date: '2026-11-13',
+    label: '🛠️ Bug-Fixes',
+    items: [
+      { icon: '⏩', title: 'Sprachnachrichten spulen', text: 'Auf der Tonspur tippen oder mit dem Finger ziehen – vor und zurück, wie du willst.' },
+      { icon: '↩️', title: 'Antworten per Wischen', text: 'Im Privatchat eine Nachricht nach rechts wischen, um direkt darauf zu antworten.' },
+      { icon: '😍', title: 'Reaktionen & Medien im Chat', text: 'Nachricht antippen und mit Emoji reagieren – und schickt euch jetzt auch Fotos und Videos.', act: 'dms', btn: 'Nachrichten öffnen' },
+    ],
+  },
+  {
     id: '2026-11-13-dm',
     date: '2026-11-13',
     items: [
@@ -1316,7 +1374,7 @@ function newsCard() {
   const n = NEWS[0];
   if (!n) return '';
   return `<section class="card news-card">
-    <div class="news-head"><span class="news-badge">✨ Neu</span><h2>Neues</h2><span class="small muted">${esc(fmt(n.date, { day: 'numeric', month: 'long' }))}</span></div>
+    <div class="news-head"><span class="news-badge">${esc(n.label || '✨ Neu')}</span><h2>Neues</h2><span class="small muted">${esc(fmt(n.date, { day: 'numeric', month: 'long' }))}</span></div>
     <div class="news-list">${n.items.map((it) => `<div class="news-item"><span class="news-ico">${it.icon}</span>
       <div class="main"><div class="title">${esc(it.title)}</div><div class="small muted">${esc(it.text)}</div>
       ${it.act ? `<button class="link news-btn" data-act="${it.act}" ${it.v ? `data-v="${it.v}"` : ''}>${esc(it.btn)} ›</button>` : ''}</div></div>`).join('')}</div>
@@ -1625,14 +1683,15 @@ function shortTime(ts) {
 function dmPreview(m) {
   const who = m.author === state.me ? 'Du: ' : '';
   if (m.voice) return `${who}🎤 Sprachnachricht (${fmtDur(m.voice.duration)})`;
+  if (m.media?.length) return `${who}${m.media.every((x) => x.kind === 'video') ? '🎬 Video' : '📷 Foto'}${m.media.length > 1 ? ` (${m.media.length})` : ''}${m.text ? ` · ${snippet(m.text, 40)}` : ''}`;
   if (m.taskId) return `${who}📋 ${state.tasks.find((t) => t.id === m.taskId)?.title || 'Aufgabe'}`;
   return who + snippet(m.text, 60);
 }
-function sendDm(to, data, { push = true } = {}) {
+function sendDm(to, data, { push = true, pushBody = null } = {}) {
   addDoc('messages', { members: [state.me, to].sort(), author: state.me, to, createdAt: Date.now(), read: false, text: '', ...data });
   haptic(8);
   if (push) {
-    const body = data.voice ? `🎤 Sprachnachricht (${fmtDur(data.voice.duration)})` : snippet(data.text, 160);
+    const body = pushBody || (data.voice ? `🎤 Sprachnachricht (${fmtDur(data.voice.duration)})` : snippet(data.text, 160));
     emit('dm', { title: `💬 ${myName()}`, body, to: [to], tab: `dm:${state.me}`, tag: `dm-${state.me}` });
   }
 }
@@ -1646,7 +1705,7 @@ function dmTaskCard(m) {
     <button class="main" data-act="task-edit" data-id="${t.id}"><div class="eyebrow-s">📋 Aufgabe</div><div class="title">${esc(t.title)}</div><div class="sub">${status}</div></button>
   </div>`;
 }
-function dmMessagesHtml(id) {
+function dmMessagesHtml(id, ui = {}) {
   const list = dmWith(id);
   if (!list.length) {
     return `<div class="empty dm-empty">${avatar(id, 64)}<p>Schreib ${esc(member(id)?.name || '')} die erste Nachricht 👋</p>
@@ -1659,49 +1718,82 @@ function dmMessagesHtml(id) {
     const d = iso(new Date(m.createdAt));
     const sep = d !== day ? `<div class="dm-day">${esc(fmtDay(d))}</div>` : '';
     day = d;
-    const kind = m.voice ? 'bare' : m.taskId ? 'rich' : '';
-    const body = m.voice ? voiceBody(m) : m.taskId ? dmTaskCard(m) + (m.text ? `<div class="txt">${richText(m.text)}</div>` : '') : richText(m.text);
+    const kind = m.voice ? 'bare' : m.taskId ? 'rich' : m.media?.length ? 'media' : '';
+    const cap = m.text ? `<div class="txt">${richText(m.text)}</div>` : '';
+    const body = m.voice ? voiceBody(m)
+      : m.taskId ? dmTaskCard(m) + cap
+        : m.media?.length ? mediaGrid({ ...m, text: '' }) + cap
+          : richText(m.text);
+    const q = m.replyTo ? state.messages.find((x) => x.id === m.replyTo) : null;
+    const quote = m.replyTo ? `<button class="dm-quote" data-jump="${esc(m.replyTo)}"><b>${q ? esc(q.author === state.me ? 'Du' : member(q.author)?.name || '?') : ''}</b><span>${q ? esc(dmPreview({ ...q, author: '' })) : 'Nachricht gelöscht'}</span></button>` : '';
+    const reacts = Object.entries(m.reactions || {});
+    const counts = {};
+    reacts.forEach(([, e]) => { counts[e] = (counts[e] || 0) + 1; });
     const seen = mine && m === lastMine ? (m.read ? ' · Gelesen' : ' · Gesendet') : '';
-    return `${sep}<div class="dm-msg ${mine ? 'me' : ''}">
-      <div class="dm-bubble ${kind}">${body}</div>
-      <div class="dm-meta"><span>${hhmm(m.createdAt)}${seen}</span>${mine ? `<button data-dmdel="${m.id}">Löschen</button>` : ''}</div>
+    const sel = ui.sel === m.id;
+    return `${sep}<div class="dm-msg ${mine ? 'me' : ''} ${sel ? 'sel' : ''}" data-mid="${m.id}">
+      <span class="dm-swipe-ico" aria-hidden="true">${I.reply}</span>
+      ${sel ? `<div class="dm-actions" role="toolbar" aria-label="Reagieren">
+        ${QUICK_REACTIONS.slice(0, 6).map((e) => `<button data-react="${e}" class="${m.reactions?.[state.me] === e ? 'on' : ''}" aria-label="Mit ${e} reagieren">${e}</button>`).join('')}
+        <button class="dm-act-txt" data-reply="${m.id}">${I.reply}Antworten</button>
+        ${mine ? `<button class="dm-act-txt danger" data-dmdel="${m.id}" aria-label="Löschen">${I.trash}</button>` : ''}
+      </div>` : ''}
+      <div class="dm-bubble ${kind} ${quote ? 'has-quote' : ''}">${quote}${body}</div>
+      ${reacts.length ? `<button class="dm-reacts" data-react-list="${m.id}" title="${esc(reacts.map(([who, e]) => `${e} ${nameOf(who)}`).join(', '))}">${Object.entries(counts).map(([e, n]) => `${e}${n > 1 ? `<small>${n}</small>` : ''}`).join('')}</button>` : ''}
+      <div class="dm-meta"><span>${hhmm(m.createdAt)}${seen}</span></div>
     </div>`;
   }).join('');
+}
+
+function dmReact(msgId, emoji) {
+  const m = state.messages.find((x) => x.id === msgId);
+  if (!m) return;
+  const removing = m.reactions?.[state.me] === emoji;
+  mutate('messages', msgId, (x) => {
+    const r = { ...(x.reactions || {}) };
+    if (r[state.me] === emoji) delete r[state.me]; else r[state.me] = emoji;
+    return { ...x, reactions: r };
+  });
+  haptic(8);
+  if (!removing && m.author !== state.me) {
+    emit('dm', { title: `${emoji} ${myName()} hat reagiert`, body: snippet(dmPreview({ ...m, author: '' }), 120), to: [m.author], tab: `dm:${state.me}`, tag: `dmr-${msgId}` });
+  }
+}
+function dmDelete(m) {
+  removeDoc('messages', m.id);
+  (m.media || []).forEach((x) => removeMedia(store, x));
+  if (m.voice?.audioId) store.remove('audio', m.voice.audioId).catch(() => {});
 }
 
 function chatSheet(id) {
   const other = member(id);
   if (!other || id === state.me) return;
-  const open = sheets.find((s) => s.dmWith === id);
-  if (open) return;
+  if (sheets.some((s) => s.dmWith === id)) return;
   let lastHtml = '';
+  const ui = { sel: null, reply: null };
+  let root = null; // Sheet-Element (steht schon in onMount bereit)
   const api = openSheet({
     title: other.name,
     html: `<div class="dm-pres small muted" id="dm-pres">${[floorName(other.floor), presenceText(id)].filter(Boolean).join(' · ')}</div>
       <div class="dm-list" id="dmlist"></div>
+      <div class="dm-replybar" id="dm-rb" hidden></div>
       <form class="composer dm-bar" id="dmf">
         <button type="button" class="icon-btn dm-tool" id="dm-task" aria-label="Aufgabe zuteilen" title="Aufgabe zuteilen">${I.tasks}</button>
+        <label class="icon-btn dm-tool" aria-label="Foto oder Video senden" title="Foto oder Video senden">${I.photo}<input type="file" id="dm-file" accept="image/*,video/*" multiple hidden></label>
         <textarea id="dmt" rows="1" maxlength="2000" placeholder="Nachricht …" aria-label="Nachricht an ${esc(other.name)}"></textarea>
         <button type="button" class="send" id="dm-mic" aria-label="Sprachnachricht aufnehmen">${I.mic}</button>
         <button type="submit" class="send" id="dm-send" aria-label="Senden" hidden>${I.send}</button>
       </form>`,
     refresh: (api) => {
       if (!member(id)) return api.close();
-      const l = $('#dmlist', api.el);
-      const html = dmMessagesHtml(id);
       $('#dm-pres', api.el).innerHTML = [floorName(member(id).floor), presenceText(id)].filter(Boolean).join(' · ');
-      if (html !== lastHtml) {
-        const atBottom = !lastHtml || l.scrollHeight - l.scrollTop - l.clientHeight < 60;
-        lastHtml = html;
-        l.innerHTML = html;
-        updateVoiceUI();
-        if (atBottom) l.scrollTop = l.scrollHeight;
-      }
+      paint();
       if (!document.hidden) dmMarkRead(id);
     },
     onMount: (api) => {
+      root = api.el;
       api.el.classList.add('dm-sheet');
-      const f = $('#dmf', api.el), ta = $('#dmt', api.el);
+      const f = $('#dmf', api.el), ta = $('#dmt', api.el), list = $('#dmlist', api.el);
       const sync = () => { const has = !!ta.value.trim(); $('#dm-send', f).hidden = !has; $('#dm-mic', f).hidden = has; };
       ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = Math.min(140, ta.scrollHeight) + 'px'; sync(); });
       ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && matchMedia('(hover: hover)').matches) { e.preventDefault(); f.requestSubmit(); } });
@@ -1710,30 +1802,173 @@ function chatSheet(id) {
         const text = ta.value.trim();
         if (!text) return;
         ta.value = ''; ta.style.height = ''; sync();
-        sendDm(id, { text });
-        setTimeout(() => { const l = $('#dmlist', api.el); l.scrollTop = l.scrollHeight; }, 60);
+        sendDm(id, { text, ...replyData() });
+        setReply(null);
+        setTimeout(() => { list.scrollTop = list.scrollHeight; }, 60);
         ta.focus();
       };
-      $('#dm-mic', f).onclick = () => dmVoiceSheet(id);
+      $('#dm-mic', f).onclick = () => dmVoiceSheet(id, replyData(), () => setReply(null));
+      $('#dm-file', f).onchange = (e) => {
+        const files = [...e.target.files];
+        e.target.value = '';
+        if (files.length) dmMediaSheet(id, files, replyData(), () => setReply(null));
+      };
       $('#dm-task', f).onclick = () => taskSheet(null, {
         assignee: id,
         title: `Aufgabe für ${other.name}`,
         onCreate: (taskId) => sendDm(id, { taskId }, { push: false }),
       });
-      $('#dmlist', api.el).addEventListener('click', async (e) => {
+      $('#dm-rb', api.el).addEventListener('click', (e) => { if (e.target.closest('[data-rb-x]')) setReply(null); });
+
+      // Tippen: Reaktionen/Antworten/Löschen ein- und ausblenden
+      let swiped = false;
+      list.addEventListener('click', async (e) => {
+        if (swiped) { swiped = false; return; }
+        const r = e.target.closest('[data-react]');
+        if (r) { dmReact(ui.sel, r.dataset.react); ui.sel = null; return paint(); }
+        const rp = e.target.closest('[data-reply]');
+        if (rp) { ui.sel = null; setReply(rp.dataset.reply); return paint(); }
         const d = e.target.closest('[data-dmdel]');
-        if (d && await confirmSheet('Nachricht für euch beide löschen?')) removeDoc('messages', d.dataset.dmdel);
-        // Eigene Nachricht antippen → „Löschen“ einblenden
-        const msg = e.target.closest('.dm-msg.me');
-        if (!d && msg && !e.target.closest('button, a, .wave')) { $$('.dm-msg.sel', api.el).forEach((x) => x !== msg && x.classList.remove('sel')); msg.classList.toggle('sel'); }
+        if (d) {
+          const m = state.messages.find((x) => x.id === d.dataset.dmdel);
+          if (m && await confirmSheet('Nachricht für euch beide löschen?')) { ui.sel = null; dmDelete(m); }
+          return;
+        }
+        const j = e.target.closest('[data-jump]');
+        if (j) {
+          const t = $(`[data-mid="${CSS.escape(j.dataset.jump)}"]`, list);
+          if (t) { t.scrollIntoView({ behavior: 'smooth', block: 'center' }); t.classList.add('flash'); setTimeout(() => t.classList.remove('flash'), 1200); }
+          return;
+        }
+        if (e.target.closest('[data-react-list]')) {
+          const m = state.messages.find((x) => x.id === e.target.closest('[data-react-list]').dataset.reactList);
+          if (m) toast(Object.entries(m.reactions || {}).map(([who, em]) => `${em} ${nameOf(who)}`).join(' · '));
+          return;
+        }
+        const msg = e.target.closest('.dm-msg');
+        if (msg && !e.target.closest('button, a, .wave, video')) { ui.sel = ui.sel === msg.dataset.mid ? null : msg.dataset.mid; paint(); }
+        else if (!msg && ui.sel) { ui.sel = null; paint(); }
       });
+
+      // Nach rechts wischen → antworten
+      let sw = null;
+      list.addEventListener('pointerdown', (e) => {
+        const msg = e.target.closest('.dm-msg');
+        if (!msg || e.target.closest('.wave, .dm-actions') || (e.pointerType === 'mouse' && e.button !== 0)) return;
+        sw = { el: msg, x: e.clientX, y: e.clientY, dx: 0, on: false, id: e.pointerId };
+      });
+      list.addEventListener('pointermove', (e) => {
+        if (!sw || e.pointerId !== sw.id) return;
+        const dx = e.clientX - sw.x, dy = e.clientY - sw.y;
+        if (!sw.on) {
+          if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { sw = null; return; }
+          if (dx > 12 && dx > Math.abs(dy) * 1.5) { sw.on = true; sw.el.classList.add('swiping'); getSelection()?.removeAllRanges(); try { list.setPointerCapture(e.pointerId); } catch { /* egal */ } }
+          else return;
+        }
+        e.preventDefault();
+        sw.dx = Math.max(0, Math.min(90, dx));
+        sw.el.style.setProperty('--sx', `${sw.dx}px`);
+        sw.el.classList.toggle('armed', sw.dx > 60);
+      });
+      const end = () => {
+        if (!sw) return;
+        const { el, on, dx } = sw;
+        sw = null;
+        if (!on) return;
+        swiped = true;
+        setTimeout(() => { swiped = false; }, 350);
+        el.classList.remove('swiping', 'armed');
+        el.style.removeProperty('--sx');
+        if (dx > 60) { haptic(12); setReply(el.dataset.mid); ta.focus(); }
+      };
+      list.addEventListener('pointerup', end);
+      list.addEventListener('pointercancel', end);
+
       api.refresh(api);
     },
   });
   api.dmWith = id;
+
+  function replyData() { return ui.reply ? { replyTo: ui.reply } : {}; }
+  function setReply(mid) {
+    ui.reply = mid;
+    const bar = $('#dm-rb', root);
+    const m = mid && state.messages.find((x) => x.id === mid);
+    bar.hidden = !m;
+    if (m) {
+      bar.innerHTML = `<span class="dm-rb-ico">${I.reply}</span><div class="dm-rb-txt"><b>Antwort an ${esc(m.author === state.me ? 'dich selbst' : member(m.author)?.name || '?')}</b><span>${esc(dmPreview({ ...m, author: '' }))}</span></div>
+        <button type="button" class="icon-btn" data-rb-x aria-label="Antwort abbrechen">${I.close}</button>`;
+    }
+  }
+  function paint() {
+    const l = root && $('#dmlist', root);
+    if (!l) return;
+    const html = dmMessagesHtml(id, ui);
+    if (html === lastHtml) return;
+    const atBottom = !lastHtml || l.scrollHeight - l.scrollTop - l.clientHeight < 60;
+    lastHtml = html;
+    l.innerHTML = html;
+    updateVoiceUI();
+    hydrateMedia();
+    if (atBottom && !ui.sel) l.scrollTop = l.scrollHeight;
+  }
 }
 
-function dmVoiceSheet(to) {
+function dmMediaSheet(to, files, extra = {}, onSent) {
+  const items = [];
+  let processing = 0;
+  openSheet({
+    title: `📷 An ${member(to)?.name || ''}`,
+    html: `<form id="mf2"><div class="attach" id="dm-att"></div>
+      <div class="field"><label for="dm-cap">Text dazu (optional)</label><input id="dm-cap" maxlength="500" placeholder="z. B. Schau mal 😄"></div>
+      <div class="sheet-actions"><button class="btn primary" type="submit">${I.send}Senden</button></div></form>`,
+    onMount: async (api) => {
+      const f = $('#mf2', api.el), att = $('#dm-att', f);
+      const draw = () => {
+        att.innerHTML = items.map((a, i) => `<div class="att">${(a.kind === 'image' ? a.preview : a.poster) ? `<img alt="" src="${esc(a.kind === 'image' ? a.preview : a.poster)}">` : '<span class="vph"></span>'}${a.kind === 'video' ? `<span class="vplay sm">${I.play}</span>` : ''}<button type="button" class="att-x" data-att-del="${i}" aria-label="Entfernen">${I.close}</button></div>`).join('')
+          + '<div class="att loading"><div class="spinner"></div></div>'.repeat(processing);
+      };
+      att.addEventListener('click', (e) => { const x = e.target.closest('[data-att-del]'); if (x) { items.splice(+x.dataset.attDel, 1); draw(); if (!items.length && !processing) api.close(); } });
+      f.onsubmit = async (e) => {
+        e.preventDefault();
+        if (processing) return toast('Moment, die Dateien werden noch vorbereitet …');
+        if (!items.length) return api.close();
+        const submit = $('button[type=submit]', f);
+        submit.disabled = true;
+        try {
+          const total = items.reduce((n, a) => n + a.blob.size, 0) || 1;
+          let doneBytes = 0;
+          const metas = [];
+          for (const a of items) {
+            metas.push(await uploadMedia(store, a, {
+              id: newId(), author: state.me,
+              onProgress: (fr) => { submit.textContent = `Sende … ${Math.round(((doneBytes + fr * a.blob.size) / total) * 100)} %`; },
+            }));
+            doneBytes += a.blob.size;
+          }
+          const n = metas.length, vids = metas.filter((m) => m.kind === 'video').length;
+          sendDm(to, { media: metas, text: $('#dm-cap', f).value.trim(), ...extra }, { pushBody: vids === n ? (n > 1 ? `🎬 ${n} Videos` : '🎬 Video') : vids ? `📷 ${n} Fotos & Videos` : n > 1 ? `📷 ${n} Fotos` : '📷 Foto' });
+          onSent?.();
+          api.close();
+        } catch (err) {
+          console.error(err);
+          submit.disabled = false;
+          submit.innerHTML = `${I.send}Senden`;
+          toast(`⚠️ ${err.message || 'Senden fehlgeschlagen'}`, 4500);
+        }
+      };
+      for (const file of files.slice(0, MAX_ITEMS)) {
+        processing++; draw();
+        try { items.push(await prepareFile(file)); } catch (e) { toast(`⚠️ ${e.message}`, 4500); }
+        processing--; draw();
+      }
+      if (files.length > MAX_ITEMS) toast(`Maximal ${MAX_ITEMS} Fotos/Videos auf einmal`);
+      if (!items.length) api.close();
+    },
+  });
+}
+
+function dmVoiceSheet(to, extra = {}, onSent) {
   let recorder = null;
   openSheet({
     title: `🎤 An ${member(to)?.name || ''}`,
@@ -1768,7 +2003,8 @@ function dmVoiceSheet(to) {
             store.add('audio', { id: audioId, data, mime: r.mime, duration: r.duration, author: state.me, createdAt: Date.now() }),
             new Promise((res) => setTimeout(res, 4000)),
           ]);
-          sendDm(to, { voice: { audioId, duration: r.duration, peaks: r.peaks, mime: r.mime, heard: [] } });
+          sendDm(to, { voice: { audioId, duration: r.duration, peaks: r.peaks, mime: r.mime, heard: [] }, ...extra });
+          onSent?.();
           api.close();
         } catch (e) {
           console.error(e);
@@ -2993,7 +3229,6 @@ const ACTIONS = {
   'react-pick': (d) => reactSheet(d.id),
   'voice-play': (d) => playVoice(d.id),
   'media-open': (d) => openViewer(d.id, +d.i),
-  'voice-seek': (d, el, e) => { const r = el.getBoundingClientRect(); playVoice(d.id, Math.max(0, Math.min(1, (e.clientX - r.left) / r.width))); },
   comments: (d) => commentsSheet(d.id),
   'post-menu': (d) => postMenu(d.id),
   vote: (d) => vote(d.id, d.opt),

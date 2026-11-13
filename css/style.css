@@ -1250,3 +1250,81 @@ img.blur { filter: blur(14px) saturate(1.2); transform: scale(1.08); }
 .news-item .small { line-height: 1.3; margin-top: 1px; }
 .news-btn { margin-top: 5px; font-size: 14px; font-weight: 650; color: var(--accent); }
 @media (min-width: 900px) { .news-list { grid-template-columns: repeat(3, 1fr); gap: 0 18px; } .news-item + .news-item { border-top: 0; } }
+
+/* ─── Chat: Wischen zum Antworten, Reaktionen, Zitate, Medien ─────────────── */
+.dm-list { overflow-x: hidden; }
+.dm-msg { position: relative; touch-action: pan-y; transform: translateX(var(--sx, 0)); transition: transform .3s var(--spring); }
+.dm-msg.swiping { transition: none; }
+.dm-swipe-ico {
+  position: absolute; left: -34px; top: 50%; width: 28px; height: 28px; margin-top: -14px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--fill); color: var(--text-2);
+  opacity: 0; transform: scale(.6); transition: opacity .15s, transform .2s var(--spring);
+}
+.dm-swipe-ico svg { width: 16px; height: 16px; }
+.dm-msg.me .dm-swipe-ico { left: auto; right: calc(100% + 6px); }
+.dm-msg.swiping .dm-swipe-ico { opacity: .6; }
+.dm-msg.armed .dm-swipe-ico { opacity: 1; transform: scale(1); background: var(--accent-btn, var(--accent)); color: var(--on-accent, #fff); }
+.dm-msg.flash .dm-bubble { animation: dmFlash 1.2s ease; }
+@keyframes dmFlash { 30% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent); } }
+.dm-msg.sel .dm-bubble { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent); }
+
+.dm-actions {
+  display: flex; align-items: center; gap: 2px; padding: 4px; margin-bottom: 6px; border-radius: 999px; max-width: 100vw;
+  background: var(--glass-bg-strong); box-shadow: var(--glass-shadow), var(--glass-inner);
+  -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%);
+  animation: dmPop .22s var(--spring) both; flex-wrap: wrap;
+}
+@keyframes dmPop { from { opacity: 0; transform: translateY(6px) scale(.9); } }
+.dm-actions button { width: 36px; height: 36px; border-radius: 50%; font-size: 21px; display: grid; place-items: center; transition: transform .2s var(--spring); }
+.dm-actions button:active { transform: scale(.85); }
+.dm-actions button.on { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.dm-actions .dm-act-txt { width: auto; padding: 0 12px; font-size: 14px; font-weight: 650; color: var(--accent); display: flex; gap: 5px; border-radius: 18px; }
+.dm-actions .dm-act-txt svg { width: 16px; height: 16px; }
+.dm-actions .dm-act-txt.danger { color: var(--danger); padding: 0 10px; }
+
+.dm-reacts {
+  margin: -6px 8px 0; position: relative; z-index: 1; display: inline-flex; gap: 2px; align-items: center;
+  padding: 2px 7px; border-radius: 999px; font-size: 14px; line-height: 1.3;
+  background: var(--glass-bg-strong); box-shadow: 0 1px 4px rgba(0, 0, 0, .14);
+}
+.dm-reacts small { font-size: 11px; font-weight: 700; color: var(--text-2); margin: 0 2px 0 1px; }
+
+.dm-quote {
+  display: grid; text-align: left; width: 100%; gap: 1px; margin-bottom: 6px; padding: 5px 9px; border-radius: 10px;
+  border-left: 3px solid var(--accent); background: color-mix(in srgb, var(--text) 7%, transparent); font-size: 13px; white-space: normal;
+}
+.dm-quote b { font-size: 12px; color: var(--accent); }
+.dm-quote span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: .85; }
+.dm-msg.me .dm-bubble:not(.rich):not(.bare):not(.media) .dm-quote { background: rgba(255, 255, 255, .18); border-left-color: currentColor; }
+.dm-msg.me .dm-bubble:not(.rich):not(.bare):not(.media) .dm-quote b { color: inherit; }
+.dm-bubble.bare.has-quote { background: var(--fill); padding: 6px; border-radius: 22px; }
+.dm-bubble.bare.has-quote .dm-quote { margin: 2px 4px 6px; width: auto; }
+
+.dm-bubble.media, .dm-msg.me .dm-bubble.media { background: var(--fill); color: var(--text); padding: 4px; width: min(260px, 70vw); white-space: normal; }
+.dm-msg.me .dm-bubble.media { background: color-mix(in srgb, var(--accent) 14%, var(--fill)); }
+.dm-bubble.media .mgrid { margin: 0; border-radius: 14px; overflow: hidden; }
+.dm-bubble.media .txt { margin: 6px 8px 4px; }
+.dm-bubble.media .dm-quote { margin: 2px 2px 6px; width: auto; }
+
+.dm-replybar {
+  display: flex; align-items: center; gap: 10px; margin-top: 6px; padding: 6px 6px 6px 12px; border-radius: 16px;
+  background: var(--fill); border-left: 3px solid var(--accent); flex: none;
+}
+.dm-rb-ico { color: var(--accent); display: grid; }
+.dm-rb-ico svg { width: 18px; height: 18px; }
+.dm-rb-txt { flex: 1; min-width: 0; display: grid; font-size: 13px; }
+.dm-rb-txt b { color: var(--accent); font-size: 12px; }
+.dm-rb-txt span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
+.dm-replybar .icon-btn { width: 30px; height: 30px; }
+.dm-replybar .icon-btn svg { width: 14px; height: 14px; }
+.dm-bar .dm-tool { cursor: pointer; }
+@media (max-width: 380px) { .dm-bar { gap: 6px; } .dm-bar .dm-tool { width: 38px; height: 38px; } }
+
+/* Spulen auf der Tonspur */
+.wave { touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+.wave.scrubbing { touch-action: none; }
+.wave.scrubbing i { transition: none; }
+.wave:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 6px; }
+.dm-msg.swiping, .dm-msg.swiping * { -webkit-user-select: none; user-select: none; }
+.dm-bubble.bare > .small.muted { display: none; } /* „Gehört von“ ist im Zweier-Chat überflüssig */
+.dm-bubble.media .mgrid.n1 .mtile { max-height: 340px; }
