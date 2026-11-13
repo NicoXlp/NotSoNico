@@ -14,9 +14,43 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg?v=3" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=3">
-  <link rel="stylesheet" href="css/style.css?v=28">
+  <link rel="stylesheet" href="css/style.css?v=29">
 </head>
 <body>
+  <!-- Startanimation: Kalender-Tagebuch (steht direkt im HTML, damit sie sofort erscheint) -->
+  <div class="splash" id="splash" aria-hidden="true">
+    <span class="sp-blob sp-b1"></span><span class="sp-blob sp-b2"></span><span class="sp-blob sp-b3"></span>
+    <div class="sp-card">
+      <div class="sp-rings"><i></i><i></i></div>
+      <div class="sp-head"><span id="sp-month">November</span><span id="sp-wd">Freitag</span></div>
+      <div class="sp-day">
+        <div class="sp-num sp-today" id="sp-today">13</div>
+        <div class="sp-num sp-old" id="sp-old">12</div>
+      </div>
+      <div class="sp-lines"><i></i><i></i><i></i></div>
+      <span class="sp-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+    </div>
+  </div>
+  <script>
+    // Sofort (vor dem ersten Bild): echtes Datum, Hell/Dunkel und Farbschema der App übernehmen
+    (function () {
+      try {
+        var d = new Date(), y = new Date(d.getTime() - 864e5);
+        document.getElementById('sp-month').textContent = d.toLocaleDateString('de-DE', { month: 'long' });
+        document.getElementById('sp-wd').textContent = d.toLocaleDateString('de-DE', { weekday: 'long' });
+        document.getElementById('sp-today').textContent = d.getDate();
+        document.getElementById('sp-old').textContent = y.getDate();
+        var t = JSON.parse(localStorage.getItem('vt.theme') || '"auto"');
+        if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+        var c = JSON.parse(localStorage.getItem('vt.splash') || 'null');
+        if (c) {
+          var s = document.documentElement.style;
+          s.setProperty('--sp-accent', c.accent); s.setProperty('--sp-on', c.fg);
+          (c.blobs || []).forEach(function (b, i) { s.setProperty('--sp-b' + (i + 1), b); });
+        }
+      } catch (e) { /* Standardfarben */ }
+    })();
+  </script>
   <!-- Farbiger, sanft bewegter Hintergrund – damit das Glas etwas zum Brechen hat -->
   <div class="backdrop" aria-hidden="true">
     <span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span><span class="blob b4"></span>
@@ -43,6 +77,6 @@
 
   <div id="toasts" aria-live="polite"></div>
 
-  <script type="module" src="js/app.js?v=28"></script>
+  <script type="module" src="js/app.js?v=29"></script>
 </body>
 </html>

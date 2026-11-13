@@ -1100,3 +1100,78 @@ img.blur { filter: blur(14px) saturate(1.2); transform: scale(1.08); }
 /* Zuständigkeit bei Tonnen: Profilbilder aller */
 .bin-who { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; }
 .bin-who .av-stack .av { border-color: var(--glass-bg-strong); }
+
+/* ─── Startanimation: Kalender-Tagebuch ───────────────────────────────────── */
+.splash {
+  position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; overflow: hidden;
+  background: var(--bg); transition: opacity .45s ease;
+  -webkit-user-select: none; user-select: none;
+}
+.splash.out { opacity: 0; pointer-events: none; }
+.splash.out .sp-card { transform: translateY(-8px) scale(1.04); transition: transform .45s ease; }
+.sp-blob { position: absolute; border-radius: 50%; filter: blur(60px); opacity: .75; animation: spBlob 1.2s ease-out both; }
+.sp-b1 { width: 70vmax; height: 70vmax; top: -30vmax; left: -25vmax; background: var(--sp-b1, var(--blob-1)); }
+.sp-b2 { width: 55vmax; height: 55vmax; bottom: -25vmax; right: -22vmax; background: var(--sp-b2, var(--blob-2)); }
+.sp-b3 { width: 40vmax; height: 40vmax; top: 35%; left: 55%; background: var(--sp-b3, var(--blob-3)); opacity: .55; }
+
+.sp-card {
+  position: relative; width: 196px; padding: 0 0 22px; border-radius: 30px;
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(26px) saturate(180%); backdrop-filter: blur(26px) saturate(180%);
+  box-shadow: var(--glass-shadow), var(--glass-inner);
+  animation: spCardIn .65s cubic-bezier(.2, .9, .3, 1.12) both;
+}
+/* Ringbindung */
+.sp-rings { position: absolute; top: -9px; left: 0; right: 0; display: flex; justify-content: center; gap: 64px; z-index: 3; }
+.sp-rings i {
+  width: 12px; height: 24px; border-radius: 7px; background: var(--glass-bg-strong);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 1px 3px rgba(0,0,0,.18);
+  animation: spRing .35s .3s ease-out both;
+}
+/* Kalenderkopf */
+.sp-head {
+  display: grid; justify-items: center; gap: 1px; padding: 18px 12px 10px; border-radius: 30px 30px 0 0;
+  background: var(--sp-accent, var(--accent-btn, #0972eb)); color: var(--sp-on, #fff);
+}
+.sp-head #sp-month { font-size: 15px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.sp-head #sp-wd { font-size: 12px; font-weight: 600; opacity: .85; }
+/* Tageszahl: gestriges Blatt klappt weg, heutiges erscheint */
+.sp-day { position: relative; height: 92px; -webkit-perspective: 600px; perspective: 600px; }
+.sp-num {
+  position: absolute; inset: 6px 14px 0; display: grid; place-items: center;
+  font-size: 66px; font-weight: 800; letter-spacing: -.03em; color: var(--text); line-height: 1;
+}
+.sp-old {
+  background: var(--glass-bg-strong); border-radius: 0 0 16px 16px;
+  transform-origin: top center; -webkit-backface-visibility: hidden; backface-visibility: hidden;
+  animation: spTear .6s .55s cubic-bezier(.5, 0, .75, .4) forwards;
+}
+.sp-today { animation: spPop .45s 1s cubic-bezier(.2, .9, .3, 1.3) both; }
+/* Tagebuch-Zeilen */
+.sp-lines { display: grid; gap: 9px; padding: 8px 26px 0; }
+.sp-lines i { display: block; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--text) 14%, transparent); transform-origin: left; animation: spLine .4s ease-out both; }
+.sp-lines i:nth-child(1) { animation-delay: 1.15s; }
+.sp-lines i:nth-child(2) { animation-delay: 1.28s; width: 86%; }
+.sp-lines i:nth-child(3) { animation-delay: 1.41s; width: 58%; }
+/* Häkchen */
+.sp-check {
+  position: absolute; right: -10px; bottom: -10px; width: 42px; height: 42px; border-radius: 50%;
+  display: grid; place-items: center; color: var(--sp-on, #fff); background: var(--sp-accent, var(--accent-btn, #0972eb));
+  box-shadow: 0 2px 8px rgba(0,0,0,.18); animation: spPop .4s 1.55s cubic-bezier(.2, .9, .3, 1.4) both;
+}
+.sp-check svg { width: 22px; height: 22px; }
+.sp-check path { stroke-dasharray: 24; stroke-dashoffset: 24; animation: spDraw .35s 1.75s ease-out forwards; }
+
+@keyframes spBlob { from { opacity: 0; transform: scale(.85); } }
+@keyframes spCardIn { from { opacity: 0; transform: translateY(18px) scale(.9); filter: blur(6px); } }
+@keyframes spRing { from { opacity: 0; transform: translateY(6px); } }
+@keyframes spTear { to { transform: rotateX(-110deg) translateY(6px); opacity: 0; } }
+@keyframes spPop { from { opacity: 0; transform: scale(.7); } }
+@keyframes spLine { from { transform: scaleX(0); } }
+@keyframes spDraw { to { stroke-dashoffset: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .sp-blob, .sp-card, .sp-rings i, .sp-today, .sp-lines i, .sp-check { animation: none !important; }
+  .sp-old { display: none; }
+  .sp-check path { animation: none; stroke-dashoffset: 0; }
+}
