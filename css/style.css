@@ -1545,3 +1545,7 @@ html.sheet-open, html.sheet-open body { overflow: hidden; overscroll-behavior: n
 .dm-fb .sub .pill.blue { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
 .dm-fb .sub .pill.green { background: color-mix(in srgb, var(--success) 18%, transparent); color: var(--success); }
 .dm-fb-go { margin-left: auto; font-weight: 650; color: var(--accent); }
+
+/* Profilbilder: als Hintergrund gemalt – kein farbiges Aufblitzen beim Neuzeichnen (z. B. beim Schieben der Regler) */
+.av.photo { background-color: var(--fill); background-size: cover; background-position: center; background-repeat: no-repeat; }
+.pill.priv { font-size: 11px; padding: 1px 7px; vertical-align: 1px; }
