@@ -1572,3 +1572,23 @@ html { background: var(--bg); }
   }
 }
 .sheet-backdrop { bottom: -240px; }
+
+/* ═══ Alle Fenster am Handy als schwebende Blase (wie die Privatchats) ═══
+   Kein Fenster klebt mehr am unteren Rand – so kann dort nach dem Tippen auch kein schwarzer Balken entstehen. */
+@media (max-width: 699px) {
+  .sheet-wrap, .dm-sheet.sheet-wrap { align-items: center; padding: calc(var(--safe-t) + 10px) 10px calc(var(--safe-b) + 10px); }
+  .sheet, .sheet-wrap:not(.dm-sheet) .sheet {
+    border-radius: 28px; margin-bottom: 0; padding-bottom: 0; max-height: 100%;
+    transform: translateY(28px) scale(.96); opacity: 0;
+    transition: transform .42s var(--spring), opacity .22s;
+  }
+  .sheet-wrap.open .sheet { transform: none; opacity: 1; }
+  .sheet-wrap.closing .sheet { transform: translateY(28px) scale(.96); opacity: 0; transition-duration: .25s; transition-timing-function: ease-in; }
+  .sheet-body { padding-bottom: 18px; }
+  .dm-sheet .sheet { height: 100%; }
+}
+@media (max-width: 699px) and (prefers-reduced-motion: reduce) { .sheet { transition: opacity .15s; transform: none; } }
+/* Faltbare Geräte im Flex-Modus: Fenster weiterhin nur in der oberen Hälfte */
+@media (vertical-viewport-segments: 2) {
+  .sheet-wrap, .dm-sheet.sheet-wrap { align-items: flex-start; padding: calc(var(--safe-t) + 8px) 10px calc(100dvh - env(viewport-segment-bottom 0 0) + 8px); }
+}
