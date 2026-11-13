@@ -1376,6 +1376,16 @@ function eventBody(p) {
    Neuen Eintrag oben einfügen → die Kachel zeigt immer den neuesten. */
 const NEWS = [
   {
+    id: '2026-11-13-profile',
+    date: '2026-11-13',
+    label: '✨ Neue Funktionen',
+    items: [
+      { icon: '🔒', title: 'Dein Profil gehört dir', text: 'Name, Bild, Farbe und Stockwerk kann jetzt nur noch jede:r im eigenen Profil ändern.', act: 'profile', btn: 'Mein Profil' },
+      { icon: '👤', title: 'Profile ansehen', text: 'Tippe unter „Haus“ auf eine Person: Profilbild, Stockwerk und Online-Status – plus Nachricht und Aufgabe mit einem Tipp.', act: 'tab', v: 'house', btn: 'Zu den Mitbewohner:innen' },
+      { icon: '🏷️', title: 'Spitznamen bleiben', text: 'Eigene Spitznamen für andere kannst du weiterhin im jeweiligen Profil vergeben – nur du siehst sie.' },
+    ],
+  },
+  {
     id: '2026-11-13-fixes-2',
     date: '2026-11-13',
     label: '🛠️ Bug-Fixes',
