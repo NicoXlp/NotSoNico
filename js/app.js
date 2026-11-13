@@ -1398,6 +1398,16 @@ function eventBody(p) {
    Neuen Eintrag oben einfügen → die Kachel zeigt immer den neuesten. */
 const NEWS = [
   {
+    id: '2026-11-13-everyone',
+    date: '2026-11-13',
+    label: '✨ Neue Funktionen',
+    items: [
+      { icon: '📣', title: '@everyone', text: 'Markiere in Beiträgen und Kommentaren mit @everyone alle auf einmal – so weiß jede:r, dass alle gemeint sind.', act: 'compose', v: 'post', btn: 'Beitrag schreiben' },
+      { icon: '✍️', title: 'Schnell gefunden', text: 'Einfach „@“ tippen – @everyone steht ganz oben in den Vorschlägen (auch bei „@alle“).' },
+      { icon: '🔔', title: 'Alle bekommen Bescheid', text: 'Bei @everyone geht an alle im Haus eine Mitteilung mit dem Anfang des Beitrags.' },
+    ],
+  },
+  {
     id: '2026-11-13-fixes-3',
     date: '2026-11-13',
     label: '🛠️ Bug-Fixes',
