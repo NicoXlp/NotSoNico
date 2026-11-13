@@ -206,9 +206,8 @@ a { color: var(--accent); }
   left: 50%;
   bottom: calc(var(--safe-b) + 12px);
   transform: translateX(-50%);
-  width: min(100% - 24px, 560px);
+  width: min(100% - 24px, 520px);
   display: flex;
-  gap: 10px;
   align-items: center;
 }
 .tabbar {
@@ -250,54 +249,70 @@ a { color: var(--accent); }
   display: grid; place-items: center; line-height: 1;
 }
 
+/* Linse: .lens verschiebt (nur transform → läuft flüssig auf der GPU), .lens-glass skaliert */
 .lens {
-  --x: 0px; --w: 80px; --s: 1;
   position: absolute;
   z-index: 1;
   top: 5px; bottom: 5px; left: 0;
-  width: var(--w);
+  width: 80px;
+  transform: translate3d(0, 0, 0);
+  transition: transform .5s cubic-bezier(.22, 1.16, .42, 1);
+  will-change: transform;
+  pointer-events: none;
+}
+.lens.no-anim, .tabbar.dragging .lens { transition: none; }
+.lens-glass {
+  position: absolute;
+  inset: 0;
   border-radius: 28px;
-  transform: translateX(var(--x)) scale(var(--s));
-  transition: transform .5s var(--spring), width .4s var(--spring), background .25s, box-shadow .25s;
   background: var(--lens-bg);
   box-shadow:
     inset 0 1px 1.5px rgba(255, 255, 255, .9),
     inset 0 -1px 1px rgba(255, 255, 255, .25),
     inset 0 0 12px rgba(255, 255, 255, .25),
     0 4px 14px rgba(0, 0, 0, .08);
-  pointer-events: none;
+  transform: scale(1);
+  transition: transform .42s var(--spring), background .25s, box-shadow .25s;
+  will-change: transform;
 }
-.lens::before {
+.lens-glass::before {
   content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
   background: linear-gradient(120deg, rgba(255,255,255,.95), rgba(255,255,255,.1) 40%, rgba(255,255,255,.1) 60%, rgba(255,255,255,.8));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor; mask-composite: exclude;
 }
+.tabbar.pressed:not(.dragging) .lens-glass { transform: scale(.95); }
 /* Beim Ziehen: Linse hebt ab, wird größer und durchsichtiger – wie bei iOS 26 */
-.tabbar.dragging .lens {
-  --s: 1.14;
-  transition: transform .18s var(--ease), width .3s var(--spring);
-  background: rgba(255, 255, 255, .12);
-  -webkit-backdrop-filter: blur(2px) saturate(160%) brightness(1.08);
-  backdrop-filter: blur(2px) saturate(160%) brightness(1.08);
+.tabbar.dragging .lens-glass {
+  transform: scale(1.16, 1.12);
+  background: rgba(255, 255, 255, .14);
+  -webkit-backdrop-filter: blur(1.5px) saturate(160%) brightness(1.08);
+  backdrop-filter: blur(1.5px) saturate(160%) brightness(1.08);
   box-shadow:
     inset 0 1px 2px rgba(255, 255, 255, .95),
     inset 0 -2px 3px rgba(255, 255, 255, .35),
     inset 0 0 18px rgba(255, 255, 255, .35),
     0 10px 30px rgba(0, 0, 0, .18);
 }
-.refract .tabbar.dragging .lens { backdrop-filter: url(#lg-refract) blur(1px) saturate(170%) brightness(1.08); }
+.refract .tabbar.dragging .lens-glass { backdrop-filter: url(#lg-refract) blur(1px) saturate(170%) brightness(1.08); }
 .tabbar.dragging .tab.hover { transform: scale(1.08); }
-.tabbar.pressed:not(.dragging) .lens { --s: .96; }
-
-.fab {
-  width: 66px; height: 66px; border-radius: 50%; flex: none;
-  display: grid; place-items: center;
-  color: var(--accent);
-  transition: transform .35s var(--spring);
+@media (prefers-reduced-motion: reduce) {
+  .lens { transition-duration: .2s; transition-timing-function: ease-out; }
 }
-.fab svg { width: 28px; height: 28px; }
-.fab:active { transform: scale(.9); }
+
+/* Kopfzeile: Plus-Knopf + Profil */
+.top-text { min-width: 0; }
+.top-actions { display: flex; align-items: center; gap: 10px; flex: none; }
+.add-btn {
+  width: 42px; height: 42px; border-radius: 50%; flex: none;
+  display: grid; place-items: center; color: var(--accent);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: var(--glass-shadow), var(--glass-inner);
+  transition: transform .3s var(--spring);
+}
+.add-btn svg { width: 22px; height: 22px; }
+.add-btn:active { transform: scale(.88); }
 
 /* ─── Segment-Steuerung (Glas mit gleitendem Daumen) ──────────────────────── */
 .seg {
@@ -682,12 +697,10 @@ a { color: var(--accent); }
 .welcome .card { max-width: 440px; width: 100%; padding: 28px 22px; }
 .logo {
   width: 92px; height: 92px; margin: 0 auto 16px; border-radius: 26px;
-  display: grid; place-items: center;
-  background: linear-gradient(150deg, #5ac8fa, #5e5ce6 55%, #bf5af2);
-  box-shadow: inset 0 1px 2px rgba(255,255,255,.7), inset 0 -2px 6px rgba(0,0,0,.15), 0 14px 34px rgba(94, 92, 230, .4);
-  color: #fff;
+  overflow: hidden;
+  box-shadow: 0 14px 34px rgba(214, 36, 159, .35);
 }
-.logo svg { width: 54px; height: 54px; }
+.logo img { width: 100%; height: 100%; display: block; }
 .welcome h1 { font-size: 30px; margin: 0 0 6px; letter-spacing: -.02em; }
 .divider { display: flex; align-items: center; gap: 10px; color: var(--text-3); font-size: 13px; margin: 18px 0; }
 .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--sep); }
@@ -711,8 +724,9 @@ a { color: var(--accent); }
   padding: 12px; border-radius: 14px; background: var(--fill); text-align: center;
   user-select: all; -webkit-user-select: all;
 }
-.kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.kpi { border-radius: var(--r-md); padding: 12px; text-align: left; }
+.kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
+.kpis > .card, .kpis > .card + .card { margin: 0; }
+.kpi { border-radius: var(--r-md); padding: 12px; text-align: left; display: flex; flex-direction: column; justify-content: center; min-height: 84px; }
 .kpi .n { font-size: 26px; font-weight: 800; letter-spacing: -.02em; }
 .kpi .l { font-size: 12.5px; color: var(--text-2); font-weight: 600; }
 .kpi.red .n { color: var(--danger); }
