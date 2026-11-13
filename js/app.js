@@ -2758,33 +2758,6 @@ async function connect(hid, { create } = {}) {
 }
 const pending = { tab: null, done: null };
 
-/* ─── Startanimation ─────────────────────────────────────────────────────── */
-const SPLASH_HTML = document.getElementById('splash')?.outerHTML || '';
-const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-let splashShownAt = 0; // Zählt ab dem Öffnen der Seite (performance.now() startet beim Laden)
-function hideSplash({ now = false } = {}) {
-  const el = $('#splash');
-  if (!el || el.classList.contains('out')) return;
-  const min = reducedMotion() ? 500 : 3350; // Animation einmal ganz zeigen (Buch ist nach ~3,5 s aufgeschlagen, kurz stehen lassen)
-  const wait = now ? 0 : Math.max(0, min - (performance.now() - splashShownAt));
-  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 700); }, wait);
-}
-function replaySplash() {
-  if (!SPLASH_HTML || $('#splash')) return;
-  document.body.insertAdjacentHTML('afterbegin', SPLASH_HTML);
-  splashShownAt = performance.now();
-  $('#splash').addEventListener('click', () => hideSplash({ now: true }));
-  hideSplash();
-}
-$('#splash')?.addEventListener('click', () => hideSplash({ now: true }));
-setTimeout(() => hideSplash({ now: true }), 8000); // Sicherheitsnetz
-// Nach längerer Pause (≥ 10 Min. im Hintergrund) beim Zurückkehren erneut zeigen
-let hiddenSince = 0;
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) hiddenSince = Date.now();
-  else if (hiddenSince && Date.now() - hiddenSince > 10 * 60e3) replaySplash();
-});
-
 async function boot() {
   applyTheme();
   matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => applyTheme());
@@ -2806,9 +2779,8 @@ async function boot() {
   if (url.search) history.replaceState(null, '', url.pathname);
 
   const hid = LS.get('house');
-  if (!hid) { showWelcome(); hideSplash(); return; }
+  if (!hid) return showWelcome();
   try { await connect(hid); } catch (e) { console.error(e); if (cloudConfig()) showCloudError(e, hid); else showWelcome(); }
-  hideSplash();
 }
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
