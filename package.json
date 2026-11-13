@@ -1,0 +1,15 @@
+{
+  "name": "vermietertagebuch",
+  "private": true,
+  "type": "module",
+  "description": "Vermietertagebuch – Web-App für die Hausgemeinschaft",
+  "scripts": {
+    "start": "npx --yes http-server -c-1 -p 8080 .",
+    "vapid": "npx --yes web-push generate-vapid-keys",
+    "reminders": "node scripts/send-reminders.mjs"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0",
+    "web-push": "^3.6.7"
+  }
+}

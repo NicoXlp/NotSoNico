@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Jedes Haus liegt unter households/{Haus-Code}. Der Code ist das gemeinsame Geheimnis.
+    // Zugriff nur für angemeldete Geräte (anonyme Anmeldung der App).
+    match /households/{hid}/{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
