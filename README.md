@@ -6,7 +6,7 @@ Die Web-App für eure Hausgemeinschaft – im **Liquid-Glass-Design**, für iPho
 - 🗑️ **Müllabfuhr** – Abholplan mit Kalender, „Wer ist dran?“-Rotation, **Bestätigungsfeld „Rausgestellt von …“** für alle sichtbar
 - 📅 **Abfallkalender hochladen** – jede:r kann den .ics-Kalender der Stadt hochladen und festlegen, für wen er gilt (ganzes Haus, nur ich, bestimmte Personen)
 - 🔔 **Push-Erinnerungen** – z. B. am Vorabend um 18 Uhr: „Gelber Sack rausstellen – du bist dran!“, mit Nachfassen, falls noch niemand bestätigt hat, und Button „✓ Rausgestellt“ direkt in der Mitteilung
-- 📌 **Pinnwand** – Beiträge, **Sprachnachrichten**, Umfragen und Ereignisse mit Zu-/Absage; Likes, Emoji-Reaktionen und Kommentare
+- 📌 **Pinnwand** – Beiträge mit **Fotos & Videos**, **Sprachnachrichten**, Umfragen und Ereignisse mit Zu-/Absage; Likes, Emoji-Reaktionen und Kommentare
 - 🌗 Hell/Dunkel, offline-fähig, installierbar als App (PWA)
 
 ---
@@ -80,7 +80,10 @@ Ohne Push-Einrichtung erinnert die App, solange sie geöffnet ist. Zusätzlich g
 | `js/store.js` | Datenschicht: lokal (localStorage) oder Firebase Firestore |
 | `js/trash-logic.js` | Abholtermine, Rotation, Erinnerungslogik (App **und** Server) |
 | `js/ics.js` | iCalendar Import/Export |
+| `js/media.js` | Fotos verkleinern, Videos/Fotos stückweise speichern & laden |
 | `scripts/send-reminders.mjs` | Push-Versand (GitHub Action) |
 | `sw.js` | Offline-Cache, Push-Empfang, „✓ Rausgestellt“ aus der Mitteilung |
 
-Sprachnachrichten werden komprimiert (ca. 32 kbit/s, max. ~2–3 Minuten) direkt in Firestore gespeichert – Firebase Storage (kostenpflichtiger Tarif) ist nicht nötig.
+Sprachnachrichten (ca. 32 kbit/s, max. ~2–3 Minuten), Fotos (automatisch auf max. 1600 px verkleinert) und Videos (bis 20 MB, in ~1-MB-Stücken) werden direkt in Firestore gespeichert – Firebase Storage (kostenpflichtiger Tarif) ist nicht nötig. Der kostenlose Firestore-Tarif bietet 1 GB Speicher; für viele lange Videos reicht das irgendwann nicht mehr – also lieber kurze Clips teilen.
+
+**Tipp fürs iPhone:** Damit Android-Geräte die Videos abspielen können, unter *Einstellungen → Kamera → Formate* „Maximale Kompatibilität“ wählen (sonst nimmt das iPhone in HEVC auf).

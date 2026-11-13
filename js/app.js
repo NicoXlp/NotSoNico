@@ -1,6 +1,7 @@
 import { createStore, newId, COLLECTIONS, readLocal } from './store.js';
 import { parseICS, buildICS } from './ics.js';
 import { FIREBASE_CONFIG, VAPID_PUBLIC_KEY } from './config.js';
+import { prepareFile, uploadMedia, loadMediaURL, cachedURL, removeMedia, MAX_ITEMS } from './media.js';
 import {
   pad, iso, parseISO, addDays, daysBetween, binDates, binWho as binWhoRaw, doneInfo, binAppliesTo,
   dueReminders, reminderText, DEFAULT_PREFS,
@@ -112,6 +113,7 @@ const I = {
   sparkle: svg('<path d="M12 3c.6 4.5 2.5 6.4 7 7-4.5.6-6.4 2.5-7 7-.6-4.5-2.5-6.4-7-7 4.5-.6 6.4-2.5 7-7Z"/>'),
   play: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.9l10.2-6.5a1 1 0 0 0 0-1.8L9.5 4.6A1 1 0 0 0 8 5.5Z"/></svg>',
   pause: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4.2" height="14" rx="1.4"/><rect x="13.8" y="5" width="4.2" height="14" rx="1.4"/></svg>',
+  photo: svg('<rect x="3" y="5" width="18" height="15" rx="3.5"/><circle cx="12" cy="12.5" r="3.6"/><path d="M8.5 5 10 3h4l1.5 2"/>'),
   mic: svg('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>'),
   house: svg('<path d="M3 11 12 4l9 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5h4v5"/>'),
 };
@@ -270,7 +272,7 @@ function confirmSheet(text, ok = 'Löschen', danger = true) {
       title: 'Sicher?',
       html: `<p class="muted" style="margin:0 0 18px">${esc(text)}</p>
         <div class="sheet-actions"><button class="btn" data-close>Abbrechen</button>
-        <button class="btn ${danger ? 'primary" style="background:var(--danger);box-shadow:none' : 'primary"'} id="ok">${esc(ok)}</button></div>`,
+        <button class="btn primary" ${danger ? 'style="background:var(--danger);box-shadow:none"' : ''} id="ok">${esc(ok)}</button></div>`,
       onMount: (api) => { $('#ok', api.el).onclick = () => { done = true; resolve(true); api.close(); }; },
     });
     const orig = s.close;
@@ -392,6 +394,7 @@ function onFab() {
     html: `<div class="menu-list">
       <button data-new="task">${I.tasks}<span>Aufgabe<span class="desc">Was muss erledigt werden?</span></span></button>
       <button data-new="post">${I.board}<span>Beitrag<span class="desc">Etwas an die Pinnwand schreiben</span></span></button>
+      <button data-new="photo">${I.photo}<span>Foto / Video<span class="desc">Bilder und Clips mit allen teilen</span></span></button>
       <button data-new="voice">${I.mic}<span>Sprachnachricht<span class="desc">Einfach draufsprechen</span></span></button>
       <button data-new="poll">${I.chart}<span>Umfrage<span class="desc">Alle abstimmen lassen</span></span></button>
       <button data-new="event">${I.cal}<span>Ereignis<span class="desc">Grillabend, Handwerker, Geburtstag …</span></span></button>
@@ -401,7 +404,9 @@ function onFab() {
       if (!b) return;
       api.close();
       const t = b.dataset.new;
-      setTimeout(() => (t === 'task' ? taskSheet() : composeSheet(t)), 120);
+      // Foto-Auswahl direkt im Tipp öffnen (iOS erlaubt den Dateidialog nur dort)
+      if (t === 'photo') composeSheet('photo');
+      else setTimeout(() => (t === 'task' ? taskSheet() : composeSheet(t)), 120);
     }),
   });
 }
@@ -423,6 +428,7 @@ function renderNow(animate) {
   v.innerHTML = VIEWS[state.tab]();
   syncTabbar();
   updateVoiceUI();
+  hydrateMedia();
   sheets.forEach((s) => s.refresh?.(s));
 }
 
@@ -604,7 +610,7 @@ function postCard(p, compact = false) {
   if (p.type === 'poll') body = pollBody(p);
   else if (p.type === 'event') body = eventBody(p);
   else if (p.type === 'voice') body = voiceBody(p);
-  else body = `<div class="post-text">${esc(p.text)}</div>`;
+  else body = `${p.text ? `<div class="post-text">${esc(p.text)}</div>` : ''}${mediaGrid(p)}`;
   const last = comments[comments.length - 1];
   return `<article class="card ${past ? 'past' : ''}" data-post="${p.id}">
     <div class="post-head">
@@ -626,6 +632,115 @@ function postCard(p, compact = false) {
     </div>
     ${!compact && last ? `<button class="last-comment" data-act="comments" data-id="${p.id}">${avatar(last.author, 22)}<span><b>${esc(member(last.author)?.name || '?')}</b>${esc(last.text.slice(0, 120))}${comments.length > 1 ? ` <span class="muted">· alle ${comments.length} ansehen</span>` : ''}</span></button>` : ''}
   </article>`;
+}
+
+/* ─── Fotos & Videos ──────────────────────────────────────────────────── */
+const ratio = (m) => Math.max(0.75, Math.min(1.9, (m.w || 4) / (m.h || 3))).toFixed(3);
+function mediaGrid(p) {
+  const m = p.media || [];
+  if (!m.length) return '';
+  const n = m.length;
+  return `<div class="mgrid n${Math.min(n, 4)}" ${p.text ? '' : 'style="margin-top:0"'}>${m.slice(0, 4).map((x, i) => {
+    const url = x.kind === 'image' ? cachedURL(x.id) : null;
+    return `<button class="mtile ${x.kind}" data-act="media-open" data-id="${p.id}" data-i="${i}" ${n === 1 ? `style="aspect-ratio:${ratio(x)}"` : ''} aria-label="${x.kind === 'video' ? 'Video' : 'Foto'} öffnen">
+      ${x.kind === 'image'
+        ? `<img alt="" data-media="${x.id}" class="${url ? '' : 'blur'}" src="${esc(url || x.thumb || '')}">`
+        : `${x.poster ? `<img alt="" src="${esc(x.poster)}">` : '<span class="vph"></span>'}<span class="vplay">${I.play}</span>${x.dur ? `<span class="vdur">${fmtDur(x.dur)}</span>` : ''}`}
+      ${i === 3 && n > 4 ? `<span class="more">+${n - 4}</span>` : ''}
+    </button>`;
+  }).join('')}</div>`;
+}
+function findMedia(id) {
+  for (const p of state.feed) for (const m of p.media || []) if (m.id === id) return m;
+  return null;
+}
+function hydrateOne(img) {
+  const meta = findMedia(img.dataset.media);
+  if (!meta) return;
+  loadMediaURL(store, meta).then((u) => { img.src = u; img.classList.remove('blur'); }).catch(() => {});
+}
+const mediaObserver = 'IntersectionObserver' in window
+  ? new IntersectionObserver((entries) => entries.forEach((e) => {
+    if (e.isIntersecting) { mediaObserver.unobserve(e.target); hydrateOne(e.target); }
+  }), { rootMargin: '400px' })
+  : null;
+function hydrateMedia() {
+  $$('img[data-media].blur').forEach((img) => (mediaObserver ? mediaObserver.observe(img) : hydrateOne(img)));
+}
+
+/** Vollbild-Ansicht für Fotos & Videos (wischen, Pfeiltasten, speichern) */
+function openViewer(postId, start = 0) {
+  const p = state.feed.find((x) => x.id === postId);
+  const items = p?.media || [];
+  if (!items.length) return;
+  let i = Math.min(start, items.length - 1);
+  const wrap = document.createElement('div');
+  wrap.className = 'viewer';
+  wrap.setAttribute('role', 'dialog');
+  wrap.setAttribute('aria-modal', 'true');
+  wrap.innerHTML = `
+    <div class="vbar">
+      <button class="vbtn" data-v="close" aria-label="Schließen">${I.close}</button>
+      <span class="vcount"></span>
+      <a class="vbtn" data-v="save" aria-label="Speichern">${I.download}</a>
+    </div>
+    <div class="vstage"></div>
+    ${items.length > 1 ? `<button class="vbtn vnav prev" data-v="prev" aria-label="Zurück">${I.left}</button><button class="vbtn vnav next" data-v="next" aria-label="Weiter">${I.chev}</button>` : ''}`;
+  document.body.appendChild(wrap);
+  requestAnimationFrame(() => wrap.classList.add('open'));
+  const stage = $('.vstage', wrap);
+  const save = $('[data-v=save]', wrap);
+  const show = async () => {
+    const m = items[i];
+    $('.vcount', wrap).textContent = items.length > 1 ? `${i + 1} / ${items.length}` : '';
+    save.removeAttribute('href');
+    stage.innerHTML = m.kind === 'image'
+      ? `<img alt="" class="${cachedURL(m.id) ? '' : 'blur'}" src="${esc(cachedURL(m.id) || m.thumb || '')}">`
+      : `<div class="vload">${m.poster ? `<img alt="" src="${esc(m.poster)}">` : ''}<div class="spinner"></div></div>`;
+    try {
+      const u = await loadMediaURL(store, m);
+      if (items[i] !== m || !wrap.isConnected) return;
+      if (m.kind === 'image') { const img = $('img', stage); img.src = u; img.classList.remove('blur'); }
+      else stage.innerHTML = `<video src="${u}" controls playsinline autoplay></video>`;
+      const ext = m.kind === 'image' ? 'jpg' : ((m.mime || '').split('/')[1] || 'mp4').replace('quicktime', 'mov');
+      save.href = u;
+      save.download = `vermietertagebuch-${m.id}.${ext}`;
+    } catch (e) {
+      console.error(e);
+      if (items[i] === m) stage.innerHTML = '<p class="muted center">Die Datei konnte nicht geladen werden 😕</p>';
+    }
+  };
+  const close = () => {
+    $('video', wrap)?.pause();
+    wrap.classList.remove('open');
+    setTimeout(() => wrap.remove(), 260);
+    document.removeEventListener('keydown', key, true);
+  };
+  const go = (d) => { if (items.length < 2) return; $('video', wrap)?.pause(); i = (i + d + items.length) % items.length; show(); };
+  const key = (e) => {
+    if (e.key === 'Escape') { e.stopPropagation(); close(); }
+    if (e.key === 'ArrowRight') go(1);
+    if (e.key === 'ArrowLeft') go(-1);
+  };
+  document.addEventListener('keydown', key, true);
+  wrap.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-v]');
+    if (!b) { if (e.target === wrap || e.target === stage) close(); return; }
+    if (b.dataset.v === 'close') close();
+    if (b.dataset.v === 'prev') go(-1);
+    if (b.dataset.v === 'next') go(1);
+    if (b.dataset.v === 'save' && !b.href) e.preventDefault();
+  });
+  let x0 = null, y0 = null;
+  stage.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+  stage.addEventListener('touchend', (e) => {
+    if (x0 == null) return;
+    const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) go(dx < 0 ? 1 : -1);
+    else if (dy > 90 && Math.abs(dy) > Math.abs(dx)) close();
+    x0 = null;
+  });
+  show();
 }
 
 /* ─── Sprachnachrichten ─────────────────────────────────────────────────── */
@@ -1043,6 +1158,7 @@ const VIEWS = {
       <div class="card compose-prompt" style="margin-bottom:12px">
         ${avatar(state.me, 36)}
         <button class="fake-input" data-act="compose" data-v="${state.feedFilter === 'all' ? 'post' : state.feedFilter}">${state.feedFilter === 'poll' ? 'Neue Umfrage starten …' : state.feedFilter === 'event' ? 'Neues Ereignis planen …' : 'Was gibt\'s Neues im Haus?'}</button>
+        <button class="mic-btn" data-act="compose" data-v="photo" aria-label="Foto oder Video posten">${I.photo}</button>
         <button class="mic-btn" data-act="compose" data-v="voice" aria-label="Sprachnachricht aufnehmen">${I.mic}</button>
       </div>
       <div class="stack">${list.length ? list.map((p) => postCard(p)).join('') : `<div class="card empty"><div class="big">📌</div>Hier ist noch nichts. Mach den Anfang!</div>`}</div>`;
@@ -1346,7 +1462,12 @@ function icsExport() {
    ═══════════════════════════════════════════════════════════════════════════ */
 function composeSheet(type = 'post', existing = null) {
   const p = existing;
+  const pickPhotos = type === 'photo';
+  if (pickPhotos) type = 'post';
   let kind = p?.type || type;
+  // Anhänge: bereits gespeicherte ({existing, meta}) und neu ausgewählte (prepareFile-Ergebnis)
+  let attachments = (p?.media || []).map((meta) => ({ existing: true, kind: meta.kind, meta }));
+  let processing = 0;
   let opts = p?.poll?.options?.map((o) => o.text) || ['', ''];
   const optsHtml = () => opts.map((o, i) => `<div class="row" style="margin-bottom:8px"><input class="input" data-opt="${i}" maxlength="80" placeholder="Option ${i + 1}" value="${esc(o)}">${opts.length > 2 ? `<button type="button" class="icon-btn" data-opt-del="${i}" aria-label="Entfernen">${I.close}</button>` : ''}</div>`).join('');
   const e = p?.event || { title: '', date: addDays(today(), 1), time: '', endTime: '', location: '', desc: '' };
@@ -1372,7 +1493,10 @@ function composeSheet(type = 'post', existing = null) {
         <div class="field"><label for="c-vtext">Text dazu (optional)</label><input id="c-vtext" maxlength="300" placeholder="z. B. Kurze Info an alle 🙂" value="${esc(p?.type === 'voice' ? p.text || '' : '')}"></div>
       </div>
       <div data-k="post" ${kind === 'post' ? '' : 'hidden'}>
-        <div class="field"><label for="c-text">Beitrag</label><textarea id="c-text" maxlength="4000" placeholder="Was gibt's Neues? 😊" style="min-height:140px">${esc(p?.text || '')}</textarea></div>
+        <div class="field"><label for="c-text">Beitrag</label><textarea id="c-text" maxlength="4000" placeholder="Was gibt's Neues? 😊" style="min-height:${attachments.length || pickPhotos ? 90 : 140}px">${esc(p?.text || '')}</textarea></div>
+        <div class="attach" id="att"></div>
+        <label class="btn sm attach-btn">${I.photo}Fotos / Videos hinzufügen<input type="file" id="c-files" accept="image/*,video/*" multiple hidden></label>
+        <p class="small muted" style="margin:6px 4px 12px">Bis zu ${MAX_ITEMS} Stück · Videos bis 20 MB (am besten kurze Clips)</p>
       </div>
       <div data-k="poll" ${kind === 'poll' ? '' : 'hidden'}>
         <div class="field"><label for="c-q">Frage</label><input id="c-q" maxlength="200" placeholder="z. B. Was grillen wir am Samstag?" value="${esc(p?.poll?.question || '')}"></div>
@@ -1395,6 +1519,29 @@ function composeSheet(type = 'post', existing = null) {
     onMount: (api) => {
       const f = $('#f', api.el);
       if (!p) recorder = setupRecorder($('[data-k=voice]', f));
+      const renderAtt = () => {
+        $('#att', f).innerHTML = attachments.map((a, i) => {
+          const src = a.existing ? (a.kind === 'image' ? cachedURL(a.meta.id) || a.meta.thumb : a.meta.poster) : (a.kind === 'image' ? a.preview : a.poster);
+          return `<div class="att">${src ? `<img alt="" src="${esc(src)}">` : '<span class="vph"></span>'}${a.kind === 'video' ? `<span class="vplay sm">${I.play}</span>` : ''}<button type="button" class="att-x" data-att-del="${i}" aria-label="Entfernen">${I.close}</button></div>`;
+        }).join('') + '<div class="att loading"><div class="spinner"></div></div>'.repeat(processing);
+      };
+      renderAtt();
+      const fileInput = $('#c-files', f);
+      fileInput.onchange = async () => {
+        const files = [...fileInput.files];
+        fileInput.value = '';
+        for (const file of files) {
+          if (attachments.length + processing >= MAX_ITEMS) { toast(`Maximal ${MAX_ITEMS} Fotos/Videos pro Beitrag`); break; }
+          processing++; renderAtt();
+          try { attachments.push(await prepareFile(file)); } catch (e) { toast(`⚠️ ${e.message}`, 4500); }
+          processing--; renderAtt();
+        }
+      };
+      $('#att', f).addEventListener('click', (e) => {
+        const x = e.target.closest('[data-att-del]');
+        if (x) { attachments.splice(+x.dataset.attDel, 1); renderAtt(); }
+      });
+      if (pickPhotos) fileInput.click();
       const syncOpts = () => { opts = $$('[data-opt]', f).map((x) => x.value); };
       f.addEventListener('click', (ev) => {
         const seg = ev.target.closest('.seg button');
@@ -1439,8 +1586,36 @@ function composeSheet(type = 'post', existing = null) {
           }
         } else if (kind === 'post') {
           const text = $('#c-text', f).value.trim();
-          if (!text) return toast('Schreib erst etwas 🙂');
+          if (processing) return toast('Moment, die Dateien werden noch vorbereitet …');
+          if (!text && !attachments.length) return toast('Schreib etwas oder füge ein Foto hinzu 🙂');
           base.text = text;
+          const fresh = attachments.filter((a) => !a.existing);
+          const submit = $('button[type=submit]', f);
+          const label = submit.innerHTML;
+          try {
+            submit.disabled = true;
+            const total = fresh.reduce((n, a) => n + a.blob.size, 0) || 1;
+            let doneBytes = 0;
+            const metas = [];
+            for (const a of attachments) {
+              if (a.existing) { metas.push(a.meta); continue; }
+              const m = await uploadMedia(store, a, {
+                id: newId(), author: state.me,
+                onProgress: (fr) => { submit.textContent = `Lade hoch … ${Math.round(((doneBytes + fr * a.blob.size) / total) * 100)} %`; },
+              });
+              doneBytes += a.blob.size;
+              metas.push(m);
+            }
+            base.media = metas;
+            // Entfernte, schon gespeicherte Medien aufräumen
+            const kept = new Set(metas.map((m) => m.id));
+            (p?.media || []).filter((m) => !kept.has(m.id)).forEach((m) => removeMedia(store, m));
+          } catch (e) {
+            console.error(e);
+            submit.disabled = false;
+            submit.innerHTML = label;
+            return toast(`⚠️ ${e.message || 'Hochladen fehlgeschlagen'}`, 4500);
+          }
         } else if (kind === 'poll') {
           syncOpts();
           const question = $('#c-q', f).value.trim();
@@ -1550,6 +1725,7 @@ function postMenu(id) {
       }
       if (m === 'del' && await confirmSheet('Diesen Beitrag wirklich löschen?')) {
         if (p.voice?.audioId) { if (player.id === id) stopVoice(); store.remove('audio', p.voice.audioId).catch(() => {}); }
+        (p.media || []).forEach((m) => removeMedia(store, m));
         removeDoc('feed', id);
       }
     }),
@@ -1870,7 +2046,7 @@ function cloudSheet() {
             // Lokale Daten in die Cloud übernehmen
             await cloud.setHouse(state.house || { name: 'Unser Haus', createdAt: Date.now() });
             const local = readLocal(state.hid);
-            for (const col of [...COLLECTIONS, 'audio']) for (const doc of Object.values(local[col] || {})) await cloud.set(col, doc.id, doc);
+            for (const col of [...COLLECTIONS, 'audio', 'chunks']) for (const doc of Object.values(local[col] || {})) await cloud.set(col, doc.id, doc);
           }
           LS.set('fbconfig', c);
           toast('✓ Verbunden!');
@@ -1964,6 +2140,7 @@ const ACTIONS = {
   react: (d) => react(d.id, d.e),
   'react-pick': (d) => reactSheet(d.id),
   'voice-play': (d) => playVoice(d.id),
+  'media-open': (d) => openViewer(d.id, +d.i),
   'voice-seek': (d, el, e) => { const r = el.getBoundingClientRect(); playVoice(d.id, Math.max(0, Math.min(1, (e.clientX - r.left) / r.width))); },
   comments: (d) => commentsSheet(d.id),
   'post-menu': (d) => postMenu(d.id),
