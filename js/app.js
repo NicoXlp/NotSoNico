@@ -1422,6 +1422,16 @@ function eventBody(p) {
    Neuen Eintrag oben einfügen → die Kachel zeigt immer den neuesten. */
 const NEWS = [
   {
+    id: '2026-11-13-fixes-4',
+    date: '2026-11-13',
+    label: '🛠️ Bug-Fixes',
+    items: [
+      { icon: '🫧', title: 'Fenster als Blase', text: 'Beiträge, Aufgaben, Kommentare & Co. öffnen sich jetzt als schwebende Blase – wie die Privatchats.' },
+      { icon: '📱', title: 'Kein schwarzer Balken', text: 'Nach dem Tippen oder Markieren bleibt unten am iPhone kein schwarzer Streifen mehr stehen.' },
+      { icon: '🖥️', title: 'Auf allen Geräten', text: 'Gleiches Aussehen auf Handy, Tablet, PC und Faltbildschirmen – mit sanftem Ein- und Ausblenden.' },
+    ],
+  },
+  {
     id: '2026-11-13-everyone',
     date: '2026-11-13',
     label: '✨ Neue Funktionen',
