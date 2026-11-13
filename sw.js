@@ -1,5 +1,5 @@
 // Service Worker: Offline-Cache + Push-Mitteilungen für die Müll-Erinnerungen
-const CACHE = 'vermietertagebuch-v11';
+const CACHE = 'vermietertagebuch-v12';
 const ASSETS = [
   './', './index.html', './css/style.css', './js/app.js', './js/store.js', './js/ics.js', './js/config.js', './js/trash-logic.js', './js/media.js',
   './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
@@ -41,7 +41,7 @@ self.addEventListener('push', (e) => {
     renotify: !!d.tag,
     icon: 'icons/icon-192.png',
     badge: 'icons/icon-192.png',
-    data: { url: d.url || './?tab=trash', bin: d.bin, date: d.date },
+    data: { tab: d.tab || 'trash', bin: d.bin, date: d.date },
     actions,
   }));
 });
@@ -49,18 +49,18 @@ self.addEventListener('push', (e) => {
 // Klick auf die Mitteilung oder auf „✓ Rausgestellt“
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
-  const { bin, date } = e.notification.data || {};
+  const { bin, date, tab = 'trash' } = e.notification.data || {};
   const done = e.action === 'done' && bin && date;
   e.waitUntil((async () => {
     const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     const client = all[0];
     if (client) {
       await client.focus().catch(() => {});
-      client.postMessage(done ? { type: 'bin-done', bin, date } : { type: 'open-tab', tab: 'trash' });
+      client.postMessage(done ? { type: 'bin-done', bin, date } : { type: 'open-tab', tab });
       return;
     }
     const url = new URL('./', self.registration.scope);
-    url.searchParams.set('tab', 'trash');
+    url.searchParams.set('tab', done ? 'trash' : tab);
     if (done) url.searchParams.set('done', `${bin}:${date}`);
     await self.clients.openWindow(url.href);
   })());
