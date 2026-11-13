@@ -1,5 +1,5 @@
 // Service Worker: Offline-Cache + Push-Mitteilungen für die Müll-Erinnerungen
-const CACHE = 'vermietertagebuch-v46';
+const CACHE = 'vermietertagebuch-v47';
 const ASSETS = [
   './', './index.html', './css/style.css', './js/app.js', './js/store.js', './js/ics.js', './js/config.js', './js/trash-logic.js', './js/media.js', './js/compat.js',
   './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',

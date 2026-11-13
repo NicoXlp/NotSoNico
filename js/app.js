@@ -742,7 +742,7 @@ const header = (eyebrow, title) => `
 
 function localBanner() {
   if (store?.mode !== 'local') return '';
-  return `<div class="banner">${I.cloud}<span style="flex:1">Lokaler Modus – die Daten sind nur auf diesem Gerät.</span><button data-act="cloud">Synchronisieren</button></div>`;
+  return `<div class="banner">${I.cloud}<span class="banner-txt">Lokaler Modus – die Daten sind nur auf diesem Gerät.</span><button data-act="cloud">Synchronisieren</button></div>`;
 }
 
 /* ─── Aufgaben-Logik ─────────────────────────────────────────────────────── */
@@ -1375,6 +1375,16 @@ function eventBody(p) {
 /* ─── „Neues“: Ankündigungen auf der Startseite ──────────────────────────────
    Neuen Eintrag oben einfügen → die Kachel zeigt immer den neuesten. */
 const NEWS = [
+  {
+    id: '2026-11-13-fold',
+    date: '2026-11-13',
+    label: '✨ Neue Funktionen',
+    items: [
+      { icon: '📱', title: 'Galaxy Fold & Flip', text: 'Außendisplay, aufgeklappt oder quer – die App passt sich jetzt jedem Bildschirm an.' },
+      { icon: '🪟', title: 'Aufgeklappt mehr sehen', text: 'Auf großen Faltbildschirmen zeigt die Startseite zwei Spalten nebeneinander.' },
+      { icon: '↔️', title: 'Zwei Bildschirme', text: 'Auf Geräten mit Scharnier (z. B. Surface Duo) bleibt links die App, rechts öffnen sich Chats – nichts verschwindet im Knick.' },
+    ],
+  },
   {
     id: '2026-11-13-profile',
     date: '2026-11-13',
