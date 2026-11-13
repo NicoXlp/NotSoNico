@@ -1,32 +1,49 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
-    <!-- Farbverlauf im Stil des Instagram-Logos: Gelb unten links → Orange → Pink → Violett/Blau oben -->
-    <radialGradient id="warm" cx="0.26" cy="1.08" r="1.25">
-      <stop offset="0" stop-color="#fdf497"/>
-      <stop offset="0.07" stop-color="#fdf497"/>
-      <stop offset="0.42" stop-color="#fd5949"/>
-      <stop offset="0.62" stop-color="#d6249f"/>
-      <stop offset="0.95" stop-color="#5b3fd9"/>
-    </radialGradient>
-    <radialGradient id="cool" cx="0.12" cy="0.02" r="0.55">
-      <stop offset="0" stop-color="#3771c8"/>
-      <stop offset="0.6" stop-color="#6633cc" stop-opacity=".35"/>
-      <stop offset="1" stop-color="#6600ff" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#fff" stop-opacity=".28"/>
-      <stop offset=".45" stop-color="#fff" stop-opacity="0"/>
+    <!-- Ruhiger Verlauf in Indigo/Lavendel – passend zu den App-Farben -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5a6be0"/>
+      <stop offset="1" stop-color="#8f7ff0"/>
     </linearGradient>
+    <radialGradient id="light" cx="0.22" cy="0.12" r="0.75">
+      <stop offset="0" stop-color="#fff" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="pageL" x1="1" y1="0" x2="0" y2="0">
+      <stop offset="0" stop-color="#e6e8fb"/>
+      <stop offset=".22" stop-color="#ffffff"/>
+    </linearGradient>
+    <linearGradient id="pageR" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#e6e8fb"/>
+      <stop offset=".22" stop-color="#ffffff"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#2a2f7a" flood-opacity=".28"/>
+    </filter>
   </defs>
-  <rect width="512" height="512" fill="url(#warm)"/>
-  <rect width="512" height="512" fill="url(#cool)"/>
-  <rect width="512" height="512" fill="url(#gloss)"/>
 
-  <!-- Tagebuch: Einband, Buchrücken, Lesebändchen und kleines Haus auf dem Cover -->
-  <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="132" y="92" width="248" height="328" rx="62" stroke-width="32"/>
-    <path d="M204 108v296" stroke-width="26"/>
-    <path d="M254 270l46-38 46 38v44a10 10 0 0 1-10 10h-72a10 10 0 0 1-10-10z" stroke-width="22"/>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <rect width="512" height="512" fill="url(#light)"/>
+
+  <g filter="url(#shadow)">
+    <!-- Einband (schaut unter den Seiten hervor) -->
+    <path d="M256 196c-46-30-104-36-160-26v222c56-10 114-4 160 26 46-30 104-36 160-26V170c-56-10-114-4-160 26z"
+          fill="#ffffff" fill-opacity=".38"/>
+    <!-- Linke und rechte Seite -->
+    <path d="M256 178c-40-28-92-36-142-28v210c50-8 102 0 142 28z" fill="url(#pageL)"/>
+    <path d="M256 178c40-28 92-36 142-28v210c-50-8-102 0-142 28z" fill="url(#pageR)"/>
   </g>
-  <path d="M314 76h46v96l-23-18-23 18z" fill="#fff"/>
+
+  <!-- Linke Seite: kleines Haus -->
+  <path d="M154 280l32-27 32 27v36a6 6 0 0 1-6 6h-52a6 6 0 0 1-6-6z"
+        fill="none" stroke="#5a6be0" stroke-width="11" stroke-linejoin="round"/>
+  <!-- Rechte Seite: Schreibzeilen -->
+  <g stroke="#5a6be0" stroke-opacity=".38" stroke-width="10" stroke-linecap="round" fill="none">
+    <path d="M290 222c26-9 54-12 80-10"/>
+    <path d="M290 256c26-9 54-12 80-10"/>
+    <path d="M290 290c26-9 54-12 80-10"/>
+    <path d="M290 324c18-6 36-9 52-9"/>
+  </g>
+  <!-- Lesebändchen -->
+  <path d="M247 382v62l9-9 9 9v-62z" fill="#ff8a7a"/>
 </svg>
