@@ -1556,12 +1556,12 @@ html.sheet-open, html.sheet-open body { overflow: hidden; overscroll-behavior: n
 
 /* Kein Leerraum unter der App, falls iOS die Seite nach der Tastatur verschiebt */
 html, body { min-height: 100%; }
-html { background: var(--bg); }
+/* (kein Hintergrund auf html: sonst verdeckt der body-Hintergrund die farbigen Flecken) */
 
 /* ─── Schutz gegen den schwarzen Balken unten (iPhone nach dem Schließen der Tastatur) ───
    Safari verkleinert dann manchmal den Bereich der App, bis man einmal zieht. Damit dort nie
    „nichts“ zu sehen ist, reichen Hintergrund und Fenster ein Stück über den unteren Rand hinaus. */
-html { background: var(--bg); }
+/* (kein Hintergrund auf html: sonst verdeckt der body-Hintergrund die farbigen Flecken) */
 .backdrop { bottom: -240px; }
 @media (max-width: 699px) {
   /* Das Fenster selbst reicht unsichtbar 240 px unter den Bildschirmrand – ohne Naht */
