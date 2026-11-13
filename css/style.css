@@ -1592,3 +1592,7 @@ html, body { min-height: 100%; }
 @media (vertical-viewport-segments: 2) {
   .sheet-wrap, .dm-sheet.sheet-wrap { align-items: flex-start; padding: calc(var(--safe-t) + 8px) 10px calc(100dvh - env(viewport-segment-bottom 0 0) + 8px); }
 }
+
+/* Ausgleich, falls iOS den App-Bereich nach der Tastatur verkleinert lässt (siehe fixIosGap) */
+.dock { bottom: calc(max(14px, calc(var(--safe-b) + 4px)) - var(--ios-gap, 0px)); transition: bottom .25s ease; }
+.sheet-wrap { bottom: calc(0px - var(--ios-gap, 0px)); }
