@@ -1348,3 +1348,6 @@ img.blur { filter: blur(14px) saturate(1.2); transform: scale(1.08); }
 /* Sprachnachricht im Chat etwas schmaler, damit die Hervorhebung nicht am Rand abgeschnitten wird */
 .dm-bubble.bare .voice { min-width: 0; width: min(240px, 66vw); }
 .dm-list { padding-left: 6px; padding-right: 6px; }
+.dm-bubble.bare .voice { width: min(250px, 68vw); gap: 10px; }
+.dm-bubble.bare .wave { gap: 1px; overflow: hidden; }
+.dm-bubble.bare .voice .dur { flex: none; }
