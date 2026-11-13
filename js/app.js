@@ -160,6 +160,7 @@ const state = {
   feedFilter: 'all',
   binScope: LS.get('binScope', 'mine'),
   calMonth: null,
+  presence: [],
 };
 if (!TABS.some((t) => t.id === state.tab)) state.tab = 'home';
 let store = null;
@@ -173,8 +174,63 @@ function avatar(id, size = 32) {
   if (id === 'all') return `<span class="av" style="--s:${size}px;--c:#8e8e93" title="Alle">👥</span>`;
   const m = member(id);
   if (!m) return `<span class="av" style="--s:${size}px;--c:#8e8e93">?</span>`;
-  if (m.photo) return `<span class="av photo" style="--s:${size}px;--c:${esc(m.color)}" title="${esc(m.name)}"><img src="${esc(m.photo)}" alt="" loading="lazy" decoding="async"></span>`;
-  return `<span class="av" style="--s:${size}px;--c:${esc(m.color)}" title="${esc(m.name)}">${esc(m.emoji || m.name.slice(0, 1))}</span>`;
+  const dot = size >= 20 && id !== state.me && presenceOf(id)?.online ? '<i class="online-dot" aria-label="online"></i>' : '';
+  if (m.photo) return `<span class="av photo" style="--s:${size}px;--c:${esc(m.color)}" title="${esc(m.name)}"><img src="${esc(m.photo)}" alt="" loading="lazy" decoding="async">${dot}</span>`;
+  return `<span class="av" style="--s:${size}px;--c:${esc(m.color)}" title="${esc(m.name)}">${esc(m.emoji || m.name.slice(0, 1))}${dot}</span>`;
+}
+
+/* ─── Online-Status ───────────────────────────────────────────────────────
+   Jede:r schreibt einmal pro Minute „bin da“ in presence/{memberId}.
+   Bleibt das länger als PRESENCE_TTL aus, gilt man als offline. */
+const PRESENCE_TTL = 150e3;
+const myPresence = () => state.presence.find((x) => x.id === state.me);
+const presenceHidden = () => myPresence()?.hidden ?? LS.get('presenceOff', false);
+function presenceOf(id) {
+  const p = state.presence.find((x) => x.id === id);
+  if (!p || p.hidden || !p.lastSeen) return null;
+  return { online: !!p.online && Date.now() - p.lastSeen < PRESENCE_TTL, lastSeen: p.lastSeen };
+}
+function lastSeenLabel(ts) {
+  const diff = Date.now() - ts;
+  if (diff < 60e3) return 'gerade eben';
+  if (diff < 3600e3) return `vor ${Math.floor(diff / 60e3)} Min.`;
+  const d = iso(new Date(ts));
+  const t = clock(ts);
+  const n = daysBetween(d, today());
+  if (n === 0) return `heute um ${t}`;
+  if (n === 1) return `gestern um ${t}`;
+  if (n < 7) return `am ${new Intl.DateTimeFormat('de-DE', { weekday: 'long' }).format(new Date(ts))} um ${t}`;
+  return `am ${new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'short' }).format(new Date(ts))}`;
+}
+/** HTML für die Statuszeile, leer wenn unbekannt/verborgen */
+function presenceText(id) {
+  if (id === state.me) return presenceHidden() ? '<span class="presence off">Status verborgen</span>' : '<span class="presence on">Online</span>';
+  const p = presenceOf(id);
+  if (!p) return '';
+  return p.online ? '<span class="presence on">Online</span>' : `<span class="presence">Zuletzt online ${lastSeenLabel(p.lastSeen)}</span>`;
+}
+function beat(online = true) {
+  if (!state.ready || !state.me || !store || !member(state.me)) return;
+  const doc = presenceHidden()
+    ? { hidden: true, memberId: state.me }
+    : { hidden: false, online, lastSeen: Date.now(), memberId: state.me };
+  store.set('presence', state.me, doc).catch(() => {});
+}
+function setPresenceVisible(visible) {
+  LS.set('presenceOff', !visible);
+  const doc = visible ? { hidden: false, online: true, lastSeen: Date.now(), memberId: state.me } : { hidden: true, memberId: state.me };
+  state.presence = [...state.presence.filter((x) => x.id !== state.me), { ...doc, id: state.me }];
+  store.set('presence', state.me, doc).catch(() => {});
+  toast(visible ? '🟢 Andere sehen jetzt, wann du online bist' : '🙈 Dein Online-Status ist jetzt verborgen');
+  render();
+}
+// Nur neu zeichnen, wenn sich eine sichtbare Anzeige ändert (nicht bei jedem Herzschlag)
+let presenceSig = '';
+function presenceChanged() {
+  const sig = state.members.map((m) => `${m.id}:${presenceText(m.id)}`).join('|');
+  if (sig === presenceSig) return false;
+  presenceSig = sig;
+  return true;
 }
 const nameOf = (id) => (id === state.me ? 'Du' : member(id)?.name || 'Jemand');
 
@@ -1132,6 +1188,7 @@ const VIEWS = {
         return `<button class="person card" data-act="goto-person" data-id="${p.id}">
           <div class="row">${avatar(p.id, 34)}<div class="name">${esc(p.name)}</div></div>
           <div class="stat">${plural(n, 'offene Aufgabe', 'offene Aufgaben')}${od ? ` · <span style="color:var(--danger)">${od} überfällig</span>` : ''}</div>
+          ${p.id !== state.me && presenceText(p.id) ? `<div class="stat">${presenceText(p.id)}</div>` : ''}
           <div class="meter"><i style="width:${(n / maxLoad) * 100}%"></i></div></button>`;
       }).join('')}</div>
       </div><div>
@@ -1288,7 +1345,7 @@ const VIEWS = {
         return `<button class="list-item" data-act="member-edit" data-id="${p.id}">
           ${avatar(p.id, 40)}
           <div class="main"><div class="title">${esc(p.name)}${p.id === state.me ? ' <span class="pill blue">Du</span>' : ''}</div>
-          <div class="sub">${plural(open, 'offene Aufgabe', 'offene Aufgaben')} · ${done} erledigt</div></div>
+          ${presenceText(p.id) ? `<div class="sub">${presenceText(p.id)}</div>` : ''}<div class="sub">${plural(open, 'offene Aufgabe', 'offene Aufgaben')} · ${done} erledigt</div></div>
           <span class="chev">${I.chev}</span></button>`;
       }).join('')}</div>
 
@@ -1306,6 +1363,10 @@ const VIEWS = {
 
       <h2 class="section-title">Darstellung</h2>
       ${segmented([['auto', 'Automatisch'], ['light', 'Hell'], ['dark', 'Dunkel']], theme, 'theme')}
+
+      <h2 class="section-title">Privatsphäre</h2>
+      ${toggle('pres-on', '🟢 Online-Status anzeigen', !presenceHidden())}
+      <p class="small muted" style="margin:-4px 6px 0">Wenn aus, sehen die anderen nicht, ob du gerade online bist oder wann du zuletzt da warst. Gilt für alle deine Geräte.</p>
 
       <h2 class="section-title">Daten</h2>
       <div class="menu-list">
@@ -2190,7 +2251,7 @@ function memberSheet(id, { asMe = false } = {}) {
   const v = m ? { ...m } : randomMember();
   openSheet({
     title: m ? (m.id === state.me ? 'Mein Profil' : m.name) : asMe ? 'Wer bist du?' : 'Mitglied hinzufügen',
-    html: `${!m && !asMe ? '<p class="small muted" style="margin-top:0">Für Personen ohne eigenes Gerät – sie können trotzdem Aufgaben und Müll-Dienste bekommen.</p>' : ''}${memberForm(v, m ? 'Speichern' : 'Hinzufügen')}`,
+    html: `${!m && !asMe ? '<p class="small muted" style="margin-top:0">Für Personen ohne eigenes Gerät – sie können trotzdem Aufgaben und Müll-Dienste bekommen.</p>' : ''}${m && m.id !== state.me && presenceText(m.id) ? `<p class="center small" style="margin:0 0 10px">${presenceText(m.id)}</p>` : ''}${memberForm(v, m ? 'Speichern' : 'Hinzufügen')}`,
     onMount: (api) => {
       const f = bindMemberForm(api.el, v, (val) => {
         if (m) mutate('members', m.id, (cur) => ({ ...cur, name: val.name, emoji: val.emoji, color: val.color, photo: val.photo || null }));
@@ -2470,13 +2531,14 @@ function whoAreYou(switching = false) {
     onMount: (api) => {
       api.body.addEventListener('click', (e) => {
         const b = e.target.closest('[data-pick]');
-        if (b) { state.me = b.dataset.pick; LS.set('me', state.me); api.close(); render(); syncPushSub().catch(() => {}); toast(`👋 Hallo ${member(state.me)?.name}!`); }
+        if (b) { state.me = b.dataset.pick; LS.set('me', state.me); api.close(); render(); beat(true); syncPushSub().catch(() => {}); toast(`👋 Hallo ${member(state.me)?.name}!`); }
       });
       const v = randomMember();
       bindMemberForm(api.el, v, (val) => {
         const id = addDoc('members', { name: val.name, emoji: val.emoji, color: val.color, photo: val.photo || null, createdAt: Date.now() });
         state.me = id; LS.set('me', id);
         api.close();
+        setTimeout(() => beat(true), 300);
         toast(`👋 Willkommen, ${val.name}!`);
       });
     },
@@ -2528,6 +2590,13 @@ async function connect(hid, { create } = {}) {
       render();
     });
   }
+  store.subscribe('presence', (list) => {
+    state.presence = list;
+    // Auf einem anderen Gerät verborgen? → hier übernehmen
+    const mine = list.find((x) => x.id === state.me);
+    if (mine && typeof mine.hidden === 'boolean') LS.set('presenceOff', mine.hidden);
+    if (state.ready && presenceChanged()) render();
+  });
   // Warten bis Mitglieder geladen sind
   await new Promise((res) => { const t = setInterval(() => { if (state.loaded.has('members')) { clearInterval(t); res(); } }, 30); setTimeout(() => { clearInterval(t); res(); }, 6000); });
 
@@ -2535,6 +2604,8 @@ async function connect(hid, { create } = {}) {
   $('#dock').hidden = false;
   if (pending.tab && TABS.some((t) => t.id === pending.tab)) state.tab = pending.tab;
   renderNow(true);
+  presenceChanged();
+  beat(true);
   if (!state.me || !member(state.me)) whoAreYou();
   else {
     syncPushSub().catch((e) => console.warn('Push-Sync', e));
@@ -2585,6 +2656,11 @@ setInterval(checkLocalReminders, 60000);
 // Tageswechsel → neu zeichnen (Fälligkeiten, „Heute“ usw.)
 let lastDay = today();
 setInterval(() => { if (today() !== lastDay) { lastDay = today(); render(); } }, 60000);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) { render(); checkLocalReminders(); } });
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) { beat(true); render(); checkLocalReminders(); } else beat(false);
+});
+window.addEventListener('pagehide', () => beat(false));
+setInterval(() => { if (!document.hidden) beat(true); if (state.ready && presenceChanged()) render(); }, 60000);
+document.addEventListener('change', (e) => { if (e.target.id === 'pres-on') setPresenceVisible(e.target.checked); });
 
 boot();

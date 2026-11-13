@@ -967,7 +967,7 @@ img.blur { filter: blur(14px) saturate(1.2); transform: scale(1.08); }
 .compose-prompt .mic-btn + .mic-btn { margin-left: -4px; }
 
 /* ─── Profilbilder ────────────────────────────────────────────────────────── */
-.av.photo { background: var(--c); overflow: hidden; }
+.av.photo { background: var(--c); }
 .av.photo img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
 .profile-photo { display: grid; justify-items: center; gap: 12px; margin-bottom: 16px; }
 .crop-stage {
@@ -989,3 +989,16 @@ img.blur { filter: blur(14px) saturate(1.2); transform: scale(1.08); }
 /* Kompakte Zeilenabstände – überall gut lesbar, aber ohne große Lücken */
 .small, .list-item .sub, .menu-list .desc, .event-meta, .bubble .txt, .post-text, .poll-q, .banner { line-height: 1.25; }
 .section-title, .card h3, .welcome h1, .sheet-head h2 { line-height: 1.15; }
+
+/* ─── Online-Status ───────────────────────────────────────────────────────── */
+.av { position: relative; }
+.online-dot {
+  position: absolute; right: -1px; bottom: -1px;
+  width: max(9px, calc(var(--s) * .27)); height: max(9px, calc(var(--s) * .27));
+  border-radius: 50%; background: #34c759;
+  box-shadow: 0 0 0 2px var(--bg), 0 0 6px rgba(52, 199, 89, .6);
+}
+.presence { color: var(--text-2); }
+.presence.on { color: var(--success); font-weight: 650; }
+.presence.on::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 5px; vertical-align: 1px; }
+.presence.off { font-style: italic; }
