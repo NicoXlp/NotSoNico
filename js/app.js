@@ -2185,28 +2185,33 @@ function fbOwner() {
   return (state.members.find((m) => /^nico\b/i.test(String(m.name || '').trim())) || membersSorted()[0])?.id || null;
 }
 const FB_STATUS = { open: ['Offen', ''], doing: ['In Arbeit', 'blue'], done: ['Erledigt', 'green'] };
-const fbSorted = () => [...state.feedback].sort((a, b) =>
-  (a.status === 'done') - (b.status === 'done') || (b.votes?.length || 0) - (a.votes?.length || 0) || (b.createdAt || 0) - (a.createdAt || 0));
+// Jede:r sieht nur die eigenen Meldungen – nur die zuständige Person (Standard: Nico) sieht alle
+const fbIsOwner = () => fbOwner() === state.me;
+const fbVisible = () => (fbIsOwner() ? state.feedback : state.feedback.filter((f) => f.author === state.me));
+const fbSorted = () => [...fbVisible()].sort((a, b) =>
+  (a.status === 'done') - (b.status === 'done') || (b.createdAt || 0) - (a.createdAt || 0));
 function fbRow(f, compact = false) {
   const [ico, label] = FB_KIND[f.kind] || FB_KIND.wish;
   const [stTxt, stCls] = FB_STATUS[f.status] || FB_STATUS.open;
-  const voted = (f.votes || []).includes(state.me);
   return `<div class="list-item fb-item ${f.status === 'done' ? 'done' : ''}">
     <span class="fb-ico ${f.kind}" title="${label}">${ico}</span>
     <button class="main" data-act="fb-open" data-id="${f.id}" style="text-align:left">
       <div class="title">${esc(f.title)}</div>
-      <div class="sub"><span class="pill ${stCls}">${stTxt}</span><span>${esc(nameOf(f.author))} · ${relTime(f.createdAt)}</span></div>
+      <div class="sub"><span class="pill ${stCls}">${stTxt}</span><span>${fbIsOwner() && f.author !== state.me ? `${esc(nameOf(f.author))} · ` : ''}${relTime(f.createdAt)}</span></div>
       ${!compact && f.text ? `<div class="fb-text">${esc(f.text)}</div>` : ''}
     </button>
-    <button class="fb-vote ${voted ? 'on' : ''}" data-act="fb-vote" data-id="${f.id}" aria-label="Ich auch (${(f.votes || []).length})" title="Ich auch">👍<b>${(f.votes || []).length || ''}</b></button>
   </div>`;
 }
 function fbTile() {
-  const open = state.feedback.filter((f) => f.status !== 'done');
+  const mine = fbVisible();
+  const open = mine.filter((f) => f.status !== 'done');
   const top = fbSorted().filter((f) => f.status !== 'done').slice(0, 3);
-  return `<h2 class="section-title">Wünsche & Anregungen <button class="link" data-act="fb-list">Alle${state.feedback.length ? ` (${state.feedback.length})` : ''}</button></h2>
+  const owner = fbOwner();
+  return `<h2 class="section-title">Wünsche & Anregungen <button class="link" data-act="fb-list">${fbIsOwner() ? 'Alle' : 'Meine'}${mine.length ? ` (${mine.length})` : ''}</button></h2>
     <div class="card fb-card">
-      <p class="small muted" style="margin:0 2px 10px">Etwas funktioniert nicht oder dir fehlt eine Funktion? Sag Bescheid – alle können mit 👍 zustimmen.</p>
+      <p class="small muted" style="margin:0 2px 10px">${fbIsOwner()
+        ? 'Hier landen alle Bugs & Wünsche aus dem Haus – neue kommen bei dir auch als Privatnachricht an.'
+        : `Etwas funktioniert nicht oder dir fehlt eine Funktion? Sag Bescheid. 🔒 Deine Meldungen siehst nur du${owner ? ` – und ${esc(dn(owner))} zum Bearbeiten` : ""}.`}</p>
       <div class="fb-actions">
         <button class="btn sm" data-act="fb-new" data-v="bug">🐞 Bug melden</button>
         <button class="btn sm" data-act="fb-new" data-v="wish">💡 Wunsch äußern</button>
@@ -2233,7 +2238,8 @@ function fbSheet(kind = 'wish', id = null) {
         <input id="fb-title" required maxlength="120" value="${esc(f?.title || '')}" placeholder="${k === 'bug' ? 'z. B. Sprachnachricht spielt nicht ab' : 'z. B. Einkaufsliste für alle'}" autofocus></div>
       <div class="field"><label for="fb-text">Details (optional)</label>
         <textarea id="fb-text" maxlength="2000" placeholder="${k === 'bug' ? 'Wo ist es passiert? Was hast du gemacht? Welches Gerät?' : 'Wie stellst du dir das vor?'}">${esc(f?.text || '')}</textarea></div>
-      ${f ? `<div class="field"><span class="label">Status</span>${segmented(Object.entries(FB_STATUS).map(([v, [l]]) => [v, l]), f.status || 'open', 'noop')}</div>` : ''}
+      ${f && fbIsOwner() ? `<div class="field"><span class="label">Status</span>${segmented(Object.entries(FB_STATUS).map(([v, [l]]) => [v, l]), f.status || 'open', 'noop')}</div>` : ''}
+      ${f && !fbIsOwner() ? `<p class="small" style="margin:0 4px 12px">Status: <span class="pill ${(FB_STATUS[f.status] || FB_STATUS.open)[1]}">${(FB_STATUS[f.status] || FB_STATUS.open)[0]}</span></p>` : ''}
       <div class="sheet-actions">
         ${f && f.author === state.me ? '<button type="button" class="btn danger" id="fb-del">Löschen</button>' : ''}
         <button class="btn primary" type="submit">${f ? 'Speichern' : 'Absenden'}</button>
@@ -2291,11 +2297,11 @@ function fbListSheet() {
         <button class="btn sm block" data-act="fb-new" data-v="wish">💡 Wunsch äußern</button>
       </div>
       ${list.length ? `<div class="list card tight fb-list">${list.map((f) => fbRow(f)).join('')}</div>`
-        : '<div class="empty"><div class="big">💬</div>Noch keine Einträge – mach den Anfang!</div>'}
-      <p class="small muted center" style="margin:12px 6px 0">Tippe auf einen Eintrag, um Details oder den Status zu ändern. 👍 heißt „Ich auch“.</p>`;
+        : `<div class="empty"><div class="big">💬</div>${fbIsOwner() ? 'Noch keine Meldungen.' : 'Du hast noch nichts gemeldet.'}</div>`}
+      <p class="small muted center" style="margin:12px 6px 0">${fbIsOwner() ? 'Tippe auf einen Eintrag, um den Status zu ändern – die meldende Person bekommt Bescheid.' : '🔒 Nur du siehst deine Meldungen. Du bekommst Bescheid, sobald sich der Status ändert.'}</p>`;
   };
   openSheet({
-    title: 'Wünsche & Anregungen',
+    title: fbIsOwner() ? 'Alle Meldungen' : 'Meine Meldungen',
     html: `<div id="fbl">${html()}</div>`,
     refresh: (api) => { $('#fbl', api.el).innerHTML = html(); settleSegs(api.el); },
     onMount: (api) => {
@@ -3462,7 +3468,6 @@ const ACTIONS = {
   'goto-feed': (d) => { state.feedFilter = d.v; switchTab('board'); },
   'fb-new': (d) => fbSheet(d.v),
   'fb-open': (d) => fbSheet(null, d.id),
-  'fb-vote': (d) => fbVote(d.id),
   'fb-list': () => fbListSheet(),
   'task-toggle': (d) => toggleTask(d.id),
   'task-edit': (d) => taskSheet(d.id),
