@@ -1175,3 +1175,8 @@ img.blur { filter: blur(14px) saturate(1.2); transform: scale(1.08); }
   .sp-old { display: none; }
   .sp-check path { animation: none; stroke-dashoffset: 0; }
 }
+
+/* Beitrag: „Person markieren“ und „Fotos / Videos“ gleich breit nebeneinander */
+.attach-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: -4px 0 10px; }
+.attach-row .attach-btn { width: 100%; min-width: 0; justify-content: center; justify-self: stretch; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 10px; }
+@media (max-width: 380px) { .attach-row .attach-btn { font-size: 13px; padding: 0 6px; gap: 5px; } }
