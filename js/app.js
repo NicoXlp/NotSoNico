@@ -2556,23 +2556,64 @@ function whoAreYou(switching = false) {
 /* ═══════════════════════════════════════════════════════════════════════════
    Start
    ═══════════════════════════════════════════════════════════════════════════ */
+/** Verständliche Erklärung für Firebase-Fehler */
+function cloudErrorText(err) {
+  const c = String(err?.code || err?.message || '');
+  if (c.includes('admin-restricted-operation') || c.includes('operation-not-allowed')) return 'In Firebase ist die anonyme Anmeldung noch nicht aktiviert (Authentication → Anmeldemethode → Anonym).';
+  if (c.includes('unauthorized-domain')) return `Diese Adresse (${location.hostname}) fehlt in Firebase unter Authentication → Einstellungen → Autorisierte Domains.`;
+  if (c.includes('permission-denied') || c.includes('insufficient permissions')) return 'Die Firestore-Regeln erlauben den Zugriff nicht. Bitte die Regeln aus der Anleitung einfügen und veröffentlichen.';
+  if (c.includes('not-found') || c.includes('NOT_FOUND')) return 'Die Firestore-Datenbank wurde noch nicht angelegt.';
+  if (c.includes('network') || c.includes('unavailable') || c.includes('Failed to fetch')) return 'Keine Verbindung zum Server – bist du online?';
+  return `Unbekannter Fehler: ${c.slice(0, 120)}`;
+}
+function showCloudError(err, hid) {
+  console.error(err);
+  $('#dock').hidden = true;
+  $('#view').innerHTML = `<div class="welcome"><div class="card center">
+    ${LOGO}
+    <h1 style="font-size:24px">Verbindung klappt noch nicht</h1>
+    <p class="muted" style="margin:6px 0 18px">${esc(cloudErrorText(err))}</p>
+    <button class="btn primary block" id="retry">Erneut versuchen</button>
+    <p class="small muted" style="margin:14px 0 0">Deine Daten auf diesem Gerät bleiben erhalten.</p>
+  </div></div>`;
+  $('#retry').onclick = () => connect(hid).catch((e) => showCloudError(e, hid));
+}
+
+/** Haus aus dem lokalen Modus in die Cloud übertragen (einmalig, beim ersten Verbinden) */
+async function migrateLocalToCloud(hid) {
+  const local = readLocal(hid);
+  if (!local._house) return null;
+  $('#view').innerHTML = `<div class="loader"><div class="center"><div class="spinner" style="margin:0 auto 14px"></div><p class="muted">Deine Daten werden in die Cloud übertragen …</p></div></div>`;
+  for (const col of [...COLLECTIONS, 'audio', 'chunks']) {
+    for (const doc of Object.values(local[col] || {})) await store.set(col, doc.id, doc);
+  }
+  await store.setHouse(local._house);
+  toast('☁️ Fertig! Deine Daten sind jetzt in der Cloud', 4000);
+  return local._house;
+}
+
 async function connect(hid, { create } = {}) {
   $('#view').innerHTML = '<div class="loader"><div class="spinner"></div></div>';
   const cfg = cloudConfig();
   try {
     store = await createStore(hid, cfg);
   } catch (err) {
-    console.error(err);
-    toast('⚠️ Cloud nicht erreichbar – Offline-Daten werden angezeigt', 4500);
     if (!cfg) throw err;
-    store = await createStore(hid, cfg).catch(() => null);
-    if (!store) { showWelcome(); return; }
+    showCloudError(err, hid);
+    return;
   }
-  if (create) await store.setHouse(create);
-  let house = await store.getHouse().catch(() => null);
+  let house;
+  try {
+    if (create) await store.setHouse(create);
+    house = await store.getHouse();
+    if (!house && store.mode === 'cloud') house = await migrateLocalToCloud(hid);
+  } catch (err) {
+    if (store.mode === 'cloud') { showCloudError(err, hid); return; }
+    throw err;
+  }
   if (!house && store.mode === 'cloud') {
     toast('Kein Haus mit diesem Code gefunden 🤔', 4000);
-    LS.del('house');
+    if (LS.get('house') === hid && !readLocal(hid)._house) LS.del('house');
     showWelcome();
     return;
   }
@@ -2641,7 +2682,7 @@ async function boot() {
 
   const hid = LS.get('house');
   if (!hid) return showWelcome();
-  try { await connect(hid); } catch (e) { console.error(e); showWelcome(); }
+  try { await connect(hid); } catch (e) { console.error(e); if (cloudConfig()) showCloudError(e, hid); else showWelcome(); }
 }
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {

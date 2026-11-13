@@ -20,7 +20,14 @@
 //  };
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const FIREBASE_CONFIG = null;
+export const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyB3RbK1rJGamJWPNJGFhFsZ6Ahl42Lzavw",
+  authDomain: "vermietertagebuch-d258b.firebaseapp.com",
+  projectId: "vermietertagebuch-d258b",
+  storageBucket: "vermietertagebuch-d258b.firebasestorage.app",
+  messagingSenderId: "601016232351",
+  appId: "1:601016232351:web:3396b5685b280c55dfb5aa"
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Push-Benachrichtigungen (optional, Anleitung in README.md → „Push“)
