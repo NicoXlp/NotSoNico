@@ -392,17 +392,39 @@ const sheets = [];
 /* Hintergrund festhalten, solange ein Sheet offen ist.
    Ohne body{position:fixed} – das erzeugt auf iPhones (Home-Bildschirm-App) unten einen schwarzen Streifen.
    Stattdessen: overflow:hidden + Wisch-Gesten außerhalb der scrollbaren Sheet-Bereiche abfangen. */
-let scrollLocked = false;
+let scrollLocked = false, lockY = 0;
 function lockScroll() {
   if (scrollLocked) return;
   scrollLocked = true;
+  lockY = window.scrollY;
   document.documentElement.classList.add('sheet-open');
 }
 function unlockScroll() {
   if (!scrollLocked) return;
   scrollLocked = false;
   document.documentElement.classList.remove('sheet-open');
+  settleViewport();
 }
+
+/* iPhone/iPad: Nach dem Schließen der Tastatur bleibt die Seite manchmal nach oben verschoben –
+   unten erscheint dann ein schwarzer Balken, bis man die Seite antippt und zieht.
+   Darum: sobald die Tastatur zu ist, Position zurücksetzen und neu ausrichten. */
+const typing = () => !!document.activeElement?.matches?.('input:not([type=checkbox]):not([type=radio]):not([type=range]), textarea, [contenteditable="true"]');
+let settleTimer = 0;
+function settleViewport() {
+  clearTimeout(settleTimer);
+  settleTimer = setTimeout(() => {
+    if (typing()) return;
+    const y = scrollLocked ? lockY : window.scrollY;
+    // Kurz „anstupsen“, damit Safari die festen Elemente neu an den Bildschirm hängt
+    window.scrollTo(0, y + 1);
+    window.scrollTo(0, y);
+  }, 60);
+}
+document.addEventListener('focusout', () => settleViewport());
+window.visualViewport?.addEventListener('resize', () => { if (!typing()) settleViewport(); });
+// Während ein Fenster offen ist, darf die Seite dahinter nicht wegrutschen (iOS verschiebt sie beim Tippen)
+window.addEventListener('scroll', () => { if (scrollLocked && !typing() && Math.abs(window.scrollY - lockY) > 1) settleViewport(); }, { passive: true });
 document.addEventListener('touchmove', (e) => {
   if (!scrollLocked) return;
   const sc = e.target.closest?.('.sheet-body, .dm-list, textarea, .attach, .emoji-pick, .chips, .viewer');
