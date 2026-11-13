@@ -45,12 +45,11 @@ function relTime(ts) {
   return new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'short' }).format(new Date(ts));
 }
 function greeting() {
+  // Morgens 5–11 Uhr, tagsüber 11–18 Uhr, abends 18–5 Uhr
   const h = new Date().getHours();
-  if (h < 5) return 'Gute Nacht';
-  if (h < 11) return 'Guten Morgen';
-  if (h < 17) return 'Hallo';
-  if (h < 22) return 'Guten Abend';
-  return 'Gute Nacht';
+  if (h >= 5 && h < 11) return 'Guten Morgen';
+  if (h >= 11 && h < 18) return 'Guten Tag';
+  return 'Guten Abend';
 }
 function genCode() {
   const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -2794,7 +2793,11 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 setInterval(checkLocalReminders, 60000);
 // Tageswechsel → neu zeichnen (Fälligkeiten, „Heute“ usw.)
 let lastDay = today();
-setInterval(() => { if (today() !== lastDay) { lastDay = today(); render(); } }, 60000);
+let lastGreeting = greeting();
+setInterval(() => {
+  // Tageswechsel oder neue Tageszeit (Guten Morgen / Tag / Abend) → neu zeichnen
+  if (today() !== lastDay || greeting() !== lastGreeting) { lastDay = today(); lastGreeting = greeting(); render(); }
+}, 60000);
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) { beat(true); render(); checkLocalReminders(); } else beat(false);
 });
