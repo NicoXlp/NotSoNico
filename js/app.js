@@ -1378,6 +1378,16 @@ function eventBody(p) {
    Neuen Eintrag oben einfügen → die Kachel zeigt immer den neuesten. */
 const NEWS = [
   {
+    id: '2026-11-13-feedback',
+    date: '2026-11-13',
+    label: '✨ Neue Funktionen',
+    items: [
+      { icon: '🐞', title: 'Bugs melden', text: 'Etwas funktioniert nicht? Melde es direkt auf der Startseite unter „Wünsche & Anregungen“.', act: 'fb-new', v: 'bug', btn: 'Bug melden' },
+      { icon: '💡', title: 'Wünsche äußern', text: 'Dir fehlt eine Funktion? Schreib sie auf – sie landet direkt bei Nico zum Umsetzen.', act: 'fb-new', v: 'wish', btn: 'Wunsch äußern' },
+      { icon: '🔒', title: 'Nur für dich sichtbar', text: 'Deine Meldungen siehst nur du. Du bekommst Bescheid, sobald sie in Arbeit oder erledigt sind.', act: 'fb-list', btn: 'Meine Meldungen' },
+    ],
+  },
+  {
     id: '2026-11-13-fold',
     date: '2026-11-13',
     label: '✨ Neue Funktionen',
