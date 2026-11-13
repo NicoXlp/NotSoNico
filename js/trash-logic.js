@@ -61,6 +61,8 @@ export const DEFAULT_PREFS = { enabled: true, trash: true, dayBefore: true, hour
 
 /** Arten von Neuigkeits-Mitteilungen (einzeln abschaltbar) */
 export const EVENT_TYPES = [
+  ['dm', '💬 Privatnachrichten an mich'],
+  ['task_assigned', '📋 Mir wurde eine Aufgabe zugeteilt'],
   ['task_new', '📝 Neue Aufgaben'],
   ['task_done', '✅ Erledigte Aufgaben'],
   ['post_new', '📌 Neue Beiträge im Social Hub'],
