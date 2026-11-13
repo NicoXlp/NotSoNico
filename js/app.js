@@ -173,6 +173,7 @@ function avatar(id, size = 32) {
   if (id === 'all') return `<span class="av" style="--s:${size}px;--c:#8e8e93" title="Alle">👥</span>`;
   const m = member(id);
   if (!m) return `<span class="av" style="--s:${size}px;--c:#8e8e93">?</span>`;
+  if (m.photo) return `<span class="av photo" style="--s:${size}px;--c:${esc(m.color)}" title="${esc(m.name)}"><img src="${esc(m.photo)}" alt="" loading="lazy" decoding="async"></span>`;
   return `<span class="av" style="--s:${size}px;--c:${esc(m.color)}" title="${esc(m.name)}">${esc(m.emoji || m.name.slice(0, 1))}</span>`;
 }
 const nameOf = (id) => (id === state.me ? 'Du' : member(id)?.name || 'Jemand');
@@ -259,6 +260,7 @@ function openSheet({ title, html, onMount, refresh, onClose }) {
   sheets.push(api);
   requestAnimationFrame(() => requestAnimationFrame(() => wrap.classList.add('open')));
   onMount?.(api);
+  settleSegs(wrap);
   const first = $('[autofocus]', wrap);
   if (first && matchMedia('(hover: hover)').matches) setTimeout(() => first.focus(), 350);
   return api;
@@ -283,12 +285,89 @@ function confirmSheet(text, ok = 'Löschen', danger = true) {
   });
 }
 
+// Merkt sich die letzte Position je Umschalter, damit die Linse nach dem Neuzeichnen
+// von der alten zur neuen Position gleitet statt zu springen.
+const segPos = {};
 function segmented(items, current, act) {
   const i = Math.max(0, items.findIndex(([v]) => v === current));
-  return `<div class="seg" style="--n:${items.length};--i:${i}" role="tablist"><span class="thumb"></span>${items
+  const key = act !== 'noop' ? act : null;
+  const from = key && segPos[key] != null && segPos[key] < items.length ? segPos[key] : i;
+  if (key) segPos[key] = i;
+  return `<div class="seg" style="--n:${items.length};--i:${from}" data-i="${i}" role="tablist"><span class="thumb"><span class="thumb-glass"></span></span>${items
     .map(([v, l]) => `<button role="tab" aria-selected="${v === current}" class="${v === current ? 'on' : ''}" data-act="${act}" data-v="${esc(v)}">${l}</button>`)
     .join('')}</div>`;
 }
+/** Nach dem Neuzeichnen: Linsen von der alten zur neuen Position gleiten lassen */
+function settleSegs(root = document) {
+  const segs = $$('.seg[data-i]', root).filter((x) => x.style.getPropertyValue('--i').trim() !== x.dataset.i);
+  if (!segs.length) return;
+  requestAnimationFrame(() => requestAnimationFrame(() => segs.forEach((x) => x.style.setProperty('--i', x.dataset.i))));
+}
+
+/** Ziehen der Linse in jedem Umschalter – wie in der Navigationsleiste */
+(function segDrag() {
+  let d = null;
+  const geom = (seg) => {
+    const n = +getComputedStyle(seg).getPropertyValue('--n') || $$('button', seg).length;
+    const w = (seg.clientWidth - 8) / n;
+    return { n, w };
+  };
+  document.addEventListener('pointerdown', (e) => {
+    const seg = e.target.closest('.seg');
+    if (!seg || e.button > 0) return;
+    const { w } = geom(seg);
+    const i = +getComputedStyle(seg).getPropertyValue('--i') || 0;
+    d = { seg, id: e.pointerId, x0: e.clientX, start: i * w, w, dragging: false, x: i * w };
+    seg.classList.add('pressed');
+  });
+  document.addEventListener('pointermove', (e) => {
+    if (!d || e.pointerId !== d.id) return;
+    const dx = e.clientX - d.x0;
+    if (!d.dragging) {
+      if (Math.abs(dx) < 8) return;
+      d.dragging = true;
+      d.seg.classList.add('dragging');
+      try { d.seg.setPointerCapture(e.pointerId); } catch { /* egal */ }
+      // Linse dort anfassen, wo der Finger ist
+      const r = d.seg.getBoundingClientRect();
+      const fingerX = e.clientX - r.left - 4;
+      if (fingerX < d.start || fingerX > d.start + d.w) d.start = Math.max(0, Math.min(fingerX - d.w / 2, (geom(d.seg).n - 1) * d.w));
+      d.x0 = e.clientX;
+      haptic(5);
+    }
+    const { n, w } = geom(d.seg);
+    d.x = Math.max(0, Math.min((n - 1) * w, d.start + (e.clientX - d.x0)));
+    $('.thumb', d.seg).style.transform = `translateX(${d.x}px)`;
+    const hi = Math.round(d.x / w);
+    $$('button', d.seg).forEach((b, k) => b.classList.toggle('hover', k === hi));
+  });
+  const end = (e, cancel) => {
+    if (!d || e.pointerId !== d.id) return;
+    const { seg, dragging, x } = d;
+    d = null;
+    seg.classList.remove('pressed');
+    if (!dragging) return; // normales Tippen → der Klick übernimmt
+    const { w } = geom(seg);
+    const btns = $$('button', seg);
+    const idx = Math.max(0, Math.min(btns.length - 1, Math.round(x / w)));
+    btns.forEach((b) => b.classList.remove('hover'));
+    seg.classList.remove('dragging');
+    $('.thumb', seg).style.transform = '';
+    seg.style.setProperty('--i', idx);
+    const swallow = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+    seg.addEventListener('click', swallow, { capture: true, once: true }); // Geister-Klick nach dem Ziehen verhindern
+    setTimeout(() => seg.removeEventListener('click', swallow, { capture: true }), 400);
+    if (!cancel && !btns[idx].classList.contains('on')) {
+      const act = btns[idx].dataset.act;
+      if (act && act !== 'noop') segPos[act] = idx;
+      seg.removeEventListener('click', swallow, { capture: true });
+      btns[idx].click();
+    }
+  };
+  document.addEventListener('pointerup', (e) => end(e, false));
+  document.addEventListener('pointercancel', (e) => end(e, true));
+})();
+
 const toggle = (id, label, checked) => `<label class="toggle-row" for="${id}"><span>${label}</span><span class="switch"><input type="checkbox" id="${id}" ${checked ? 'checked' : ''}><span></span></span></label>`;
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -308,7 +387,7 @@ function buildTabbar() {
   const setX = (x) => { lensX = x; lens.style.transform = `translate3d(${x}px,0,0)`; };
   const geom = () => {
     const n = tabs().length;
-    const pad = 5;
+    const pad = 4;
     return { pad, n, w: (bar.clientWidth - pad * 2) / n };
   };
   const placeLens = (idx, animate = true) => {
@@ -452,12 +531,11 @@ function render() {
 function renderNow(animate) {
   if (!state.ready) return;
   const v = $('#view');
-  v.classList.toggle('no-anim', !animate);
-  if (animate) { v.style.animation = 'none'; void v.offsetWidth; v.style.animation = ''; }
   v.innerHTML = VIEWS[state.tab]();
   syncTabbar();
   updateVoiceUI();
   hydrateMedia();
+  settleSegs(v);
   sheets.forEach((s) => s.refresh?.(s));
 }
 
@@ -1966,14 +2044,22 @@ function confirmFromNotification(binId, date) {
    ═══════════════════════════════════════════════════════════════════════════ */
 function memberForm(v, submitLabel) {
   return `<form id="mf">
-    <div style="display:grid;place-items:center;margin-bottom:14px" id="prev">${previewAv(v)}</div>
+    <div class="profile-photo">
+      <div id="prev">${previewAv(v)}</div>
+      <div class="row" style="justify-content:center;gap:8px;flex-wrap:wrap">
+        <label class="btn sm attach-btn">${I.photo}${v.photo ? 'Foto ändern' : 'Profilbild wählen'}<input type="file" id="m-photo" accept="image/*" hidden></label>
+        <button type="button" class="btn sm danger" id="m-photo-del" ${v.photo ? '' : 'hidden'}>Entfernen</button>
+      </div>
+    </div>
     <div class="field"><label for="m-name">Name</label><input id="m-name" required maxlength="30" placeholder="Dein Name" value="${esc(v.name)}" autofocus></div>
     <div class="field"><span class="label">Emoji</span><div class="emoji-pick" id="m-emo">${MEMBER_EMOJIS.map((e) => `<button type="button" class="${e === v.emoji ? 'on' : ''}" data-e="${e}">${e}</button>`).join('')}</div></div>
     <div class="field"><span class="label">Farbe</span><div class="swatches" id="m-col">${MEMBER_COLORS.map((c) => `<button type="button" class="swatch ${c === v.color ? 'on' : ''}" style="--c:${c}" data-c="${c}" aria-label="Farbe ${c}"></button>`).join('')}</div></div>
     <div class="sheet-actions">${v.id && v.id !== state.me && state.members.length > 1 ? '<button type="button" class="btn danger" id="m-del">Entfernen</button>' : ''}<button class="btn primary" type="submit">${submitLabel}</button></div>
   </form>`;
 }
-const previewAv = (v) => `<span class="av" style="--s:84px;--c:${esc(v.color)}">${esc(v.emoji)}</span>`;
+const previewAv = (v) => (v.photo
+  ? `<span class="av photo" style="--s:96px;--c:${esc(v.color)}"><img src="${esc(v.photo)}" alt=""></span>`
+  : `<span class="av" style="--s:96px;--c:${esc(v.color)}">${esc(v.emoji)}</span>`);
 function bindMemberForm(root, v, onSubmit) {
   const f = $('#mf', root);
   f.addEventListener('click', (e) => {
@@ -1983,6 +2069,21 @@ function bindMemberForm(root, v, onSubmit) {
     if (c) { v.color = c.dataset.c; $$('#m-col button', f).forEach((x) => x.classList.toggle('on', x === c)); }
     if (em || c) $('#prev', f).innerHTML = previewAv(v);
   });
+  const photoIn = $('#m-photo', f);
+  const delBtn = $('#m-photo-del', f);
+  const syncPhotoUI = () => {
+    $('#prev', f).innerHTML = previewAv(v);
+    delBtn.hidden = !v.photo;
+    photoIn.parentElement.childNodes[1].textContent = v.photo ? 'Foto ändern' : 'Profilbild wählen';
+  };
+  photoIn.onchange = async () => {
+    const file = photoIn.files[0];
+    photoIn.value = '';
+    if (!file) return;
+    const photo = await cropPhoto(file);
+    if (photo) { v.photo = photo; syncPhotoUI(); }
+  };
+  delBtn.onclick = () => { v.photo = null; syncPhotoUI(); };
   f.onsubmit = (e) => {
     e.preventDefault();
     v.name = $('#m-name', f).value.trim();
@@ -1990,6 +2091,91 @@ function bindMemberForm(root, v, onSubmit) {
   };
   return f;
 }
+/** Profilbild zuschneiden: verschieben (Finger/Maus), zoomen (Regler, zwei Finger, Mausrad).
+ *  Liefert ein quadratisches JPEG (320 px) als Data-URL oder null. */
+function cropPhoto(file) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onerror = () => { URL.revokeObjectURL(url); toast('⚠️ Dieses Bild kann nicht geöffnet werden'); resolve(null); };
+    img.onload = () => {
+      let done = false;
+      const finish = (val) => { if (done) return; done = true; URL.revokeObjectURL(url); resolve(val); };
+      openSheet({
+        title: 'Profilbild zuschneiden',
+        html: `<p class="small muted center" style="margin:0 0 12px">Verschieben mit dem Finger, zoomen mit dem Regler oder zwei Fingern.</p>
+          <div class="crop-stage" id="cs"><img id="ci" alt="" draggable="false"><div class="crop-mask"></div></div>
+          <div class="crop-zoom">${I.photo}<input type="range" id="cz" min="1" max="4" step="0.01" value="1" aria-label="Zoom"></div>
+          <div class="sheet-actions"><button type="button" class="btn" data-close>Abbrechen</button><button type="button" class="btn primary" id="cok">Übernehmen</button></div>`,
+        onClose: () => finish(null),
+        onMount: (api) => {
+          const stage = $('#cs', api.el), el = $('#ci', api.el), zoomIn = $('#cz', api.el);
+          el.src = url;
+          const W = img.naturalWidth, H = img.naturalHeight;
+          let S = stage.clientWidth || 280;
+          let z = 1, ox = 0, oy = 0;
+          const base = () => S / Math.min(W, H);
+          const clamp = () => {
+            const dw = W * base() * z, dh = H * base() * z;
+            ox = Math.max(-(dw - S) / 2, Math.min((dw - S) / 2, ox));
+            oy = Math.max(-(dh - S) / 2, Math.min((dh - S) / 2, oy));
+          };
+          const draw = () => {
+            clamp();
+            const dw = W * base() * z, dh = H * base() * z;
+            el.style.width = `${dw}px`;
+            el.style.height = `${dh}px`;
+            el.style.transform = `translate3d(${(S - dw) / 2 + ox}px, ${(S - dh) / 2 + oy}px, 0)`;
+          };
+          const setZoom = (nz) => { z = Math.max(1, Math.min(4, nz)); zoomIn.value = z; draw(); };
+          new ResizeObserver(() => { S = stage.clientWidth || S; draw(); }).observe(stage);
+          draw();
+          zoomIn.oninput = () => setZoom(+zoomIn.value);
+          stage.addEventListener('wheel', (e) => { e.preventDefault(); setZoom(z * (e.deltaY < 0 ? 1.08 : 1 / 1.08)); }, { passive: false });
+          const pts = new Map();
+          let pinch = null;
+          stage.addEventListener('pointerdown', (e) => {
+            stage.setPointerCapture(e.pointerId);
+            pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            if (pts.size === 2) {
+              const [a, b] = [...pts.values()];
+              pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), z };
+            }
+          });
+          stage.addEventListener('pointermove', (e) => {
+            const prev = pts.get(e.pointerId);
+            if (!prev) return;
+            const cur = { x: e.clientX, y: e.clientY };
+            pts.set(e.pointerId, cur);
+            if (pts.size === 2 && pinch) {
+              const [a, b] = [...pts.values()];
+              setZoom(pinch.z * (Math.hypot(a.x - b.x, a.y - b.y) / pinch.d));
+            } else if (pts.size === 1) {
+              ox += cur.x - prev.x; oy += cur.y - prev.y; draw();
+            }
+          });
+          const up = (e) => { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; };
+          stage.addEventListener('pointerup', up);
+          stage.addEventListener('pointercancel', up);
+          $('#cok', api.el).onclick = () => {
+            const k = base() * z;
+            const dw = W * k, dh = H * k;
+            const left = (S - dw) / 2 + ox, top = (S - dh) / 2 + oy;
+            const c = document.createElement('canvas');
+            c.width = c.height = 320;
+            const ctx = c.getContext('2d');
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, -left / k, -top / k, S / k, S / k, 0, 0, 320, 320);
+            finish(c.toDataURL('image/jpeg', 0.86));
+            api.close();
+          };
+        },
+      });
+    };
+    img.src = url;
+  });
+}
+
 const randomMember = () => {
   const used = new Set(state.members.map((m) => m.color));
   return {
@@ -2007,9 +2193,9 @@ function memberSheet(id, { asMe = false } = {}) {
     html: `${!m && !asMe ? '<p class="small muted" style="margin-top:0">Für Personen ohne eigenes Gerät – sie können trotzdem Aufgaben und Müll-Dienste bekommen.</p>' : ''}${memberForm(v, m ? 'Speichern' : 'Hinzufügen')}`,
     onMount: (api) => {
       const f = bindMemberForm(api.el, v, (val) => {
-        if (m) mutate('members', m.id, (cur) => ({ ...cur, name: val.name, emoji: val.emoji, color: val.color }));
+        if (m) mutate('members', m.id, (cur) => ({ ...cur, name: val.name, emoji: val.emoji, color: val.color, photo: val.photo || null }));
         else {
-          const nid = addDoc('members', { name: val.name, emoji: val.emoji, color: val.color, createdAt: Date.now() });
+          const nid = addDoc('members', { name: val.name, emoji: val.emoji, color: val.color, photo: val.photo || null, createdAt: Date.now() });
           if (asMe) { state.me = nid; LS.set('me', nid); }
         }
         toast(m ? 'Gespeichert' : `👋 Willkommen, ${val.name}!`);
@@ -2288,7 +2474,7 @@ function whoAreYou(switching = false) {
       });
       const v = randomMember();
       bindMemberForm(api.el, v, (val) => {
-        const id = addDoc('members', { name: val.name, emoji: val.emoji, color: val.color, createdAt: Date.now() });
+        const id = addDoc('members', { name: val.name, emoji: val.emoji, color: val.color, photo: val.photo || null, createdAt: Date.now() });
         state.me = id; LS.set('me', id);
         api.close();
         toast(`👋 Willkommen, ${val.name}!`);
