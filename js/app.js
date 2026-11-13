@@ -8,7 +8,7 @@ const VAPID_PUBLIC_KEY = CONFIG.VAPID_PUBLIC_KEY ?? null;
 const PUSH_WORKER_URL = CONFIG.PUSH_WORKER_URL ?? null;
 import { prepareFile, uploadMedia, loadMediaURL, cachedURL, removeMedia, MAX_ITEMS } from './media.js';
 import {
-  pad, iso, parseISO, addDays, daysBetween, binDates, binWho as binWhoRaw, doneInfo, binAppliesTo,
+  pad, iso, parseISO, addDays, daysBetween, binDates, binWho as binWhoRaw, doneInfo, binAppliesTo, binColorFor,
   dueReminders, reminderText, DEFAULT_PREFS, EVENT_TYPES,
 } from './trash-logic.js';
 
@@ -138,15 +138,15 @@ const QUICK_REACTIONS = ['❤️', '👍', '😂', '😮', '😢', '🎉', '🙏
 const ALL_EMOJIS = ['😀', '😃', '😄', '😁', '😆', '🥹', '😅', '😂', '🤣', '😊', '😇', '🙂', '😉', '😍', '🥰', '😘', '😋', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '😣', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤯', '😳', '🥵', '🥶', '😱', '😨', '🤗', '🤔', '🫡', '🤭', '🫢', '🤫', '😶', '😐', '🙄', '😬', '😴', '🤤', '🤢', '🤧', '😷', '🤒', '🤠', '😈', '👻', '💩', '🤡', '👽', '🤖', '🎃', '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '💔', '💯', '💥', '✨', '🔥', '⭐', '👍', '👎', '👌', '✌️', '🤞', '🤝', '👏', '🙌', '🙏', '💪', '👀', '🫶', '🎉', '🎊', '🎂', '🍕', '🍔', '🍝', '🍰', '🍺', '🍷', '☕', '🧹', '🧽', '🧺', '🗑️', '♻️', '🛒', '🏠', '🔑', '💡', '🚿', '🛁', '🌱', '🌻', '🐶', '🐱', '☀️', '🌧️', '❄️', '⚡', '✅', '❌', '⚠️', '❓', '💤', '📦', '📅', '💶'];
 const BIN_COLORS = [
   ['Grau', '#6b7280'], ['Schwarz', '#2c2c30'], ['Braun', '#8b5a2b'], ['Blau', '#2f7de1'],
-  ['Gelb', '#eab308'], ['Grün', '#2fa84f'], ['Rot', '#e5484d'], ['Orange', '#f08c2e'], ['Lila', '#8e5cf7'],
+  ['Gelb', '#eab308'], ['Grün', '#2fa84f'], ['Türkis', '#14b8a6'], ['Rot', '#e5484d'], ['Orange', '#f08c2e'], ['Lila', '#8e5cf7'],
 ];
 const BIN_PRESETS = [
-  ['Restmüll', '#6b7280'], ['Biotonne', '#8b5a2b'], ['Papier', '#2f7de1'], ['Gelber Sack', '#eab308'], ['Glas', '#2fa84f'], ['Sperrmüll', '#e5484d'],
+  ['Restmüll', '#6b7280'], ['Biotonne', '#8b5a2b'], ['Papier', '#2fa84f'], ['Gelber Sack', '#eab308'], ['Glas', '#14b8a6'], ['Sperrmüll', '#e5484d'],
 ];
 const DEFAULT_BINS = [
   { name: 'Restmüll', color: '#6b7280' },
   { name: 'Biotonne', color: '#8b5a2b' },
-  { name: 'Papier', color: '#2f7de1' },
+  { name: 'Papier', color: '#2fa84f' },
   { name: 'Gelber Sack', color: '#eab308' },
 ];
 const REPEAT = { none: 'Einmalig', daily: 'Täglich', weekly: 'Wöchentlich', biweekly: 'Alle 2 Wochen', monthly: 'Monatlich' };
@@ -849,7 +849,15 @@ async function toggleBinDone(id, date) {
     return { ...b, done };
   });
 }
-const binIcon = (bin, lg) => `<span class="bin-icon ${lg ? 'lg' : ''}" style="--c:${esc(bin.color || '#6b7280')}">${I.trash}</span>`;
+const binIcon = (bin, lg) => `<span class="bin-icon ${lg ? 'lg' : ''}" style="--c:${esc(binColorFor(bin))}">${I.trash}</span>`;
+/** „Wer ist zuständig?“ – feste Person oder alle, für die die Tonne gilt */
+function binWhoHtml(p, { size = 18, short = false } = {}) {
+  if (p.who) return `${avatar(p.who, size)} ${p.who === state.me ? '<b>Du bist dran</b>' : `${esc(member(p.who)?.name || '?')} ist dran`}`;
+  const ids = (p.bin.members || []).filter(member);
+  const all = ids.length ? ids : membersSorted().map((m) => m.id);
+  const label = ids.length ? `Für ${esc(binFor(p.bin))}` : 'Für alle';
+  return `<span class="av-stack">${all.slice(0, 5).map((id) => avatar(id, size)).join('')}</span> ${short ? '' : label}`;
+}
 
 /* ─── Pinnwand-Logik ─────────────────────────────────────────────────────── */
 const feedSorted = () => [...state.feed].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (b.createdAt || 0) - (a.createdAt || 0));
@@ -1317,7 +1325,7 @@ const VIEWS = {
           <div style="flex:1;min-width:0">
             ${i === 0 ? `<div class="when">${esc(fmtDay(p.date))}</div>` : ''}
             <div style="font-weight:700">${esc(p.bin.name)}</div>
-            <div class="small muted">${p.who ? `${p.who === state.me ? '<b>Du bist dran!</b>' : `${esc(member(p.who)?.name)} ist dran`}` : 'Wer gerade Zeit hat'}${soon && !p.done ? ' · am Vorabend rausstellen' : ''}</div>
+            <div class="small muted bin-who">${binWhoHtml(p)}${soon && !p.done ? ' · am Vorabend rausstellen' : ''}</div>
           </div>
         </div>${confirmBox(p)}`).join('')}
       </div>` : `<div class="card empty"><div class="big">🗑️</div>Noch kein Abholplan. <br><button class="btn sm primary" style="margin-top:12px" data-act="tab" data-v="trash">Müllplan einrichten</button></div>`}
@@ -1416,7 +1424,7 @@ const VIEWS = {
       const d = addDays(gridStart, i);
       const ps = calPick.filter((p) => p.date === d);
       const ev = calEv.filter((p) => p.event?.date === d);
-      const dots = [...ps.map((p) => p.bin.color), ...ev.map(() => '#ff3b30')].slice(0, 4);
+      const dots = [...ps.map((p) => binColorFor(p.bin)), ...ev.map(() => '#ff3b30')].slice(0, 4);
       cells.push(`<div class="cal-day ${d.slice(0, 7) !== cm ? 'out' : ''} ${d === from ? 'today' : ''} ${dots.length ? 'has' : ''}" data-act="cal-day" data-v="${d}" role="button" aria-label="${esc(fmtLong(d))}">
         <span>${parseISO(d).getDate()}</span><span class="dots">${dots.map((c) => `<i style="--c:${esc(c)}"></i>`).join('')}</span></div>`);
     }
@@ -1435,7 +1443,7 @@ const VIEWS = {
           <div class="list-item">
             ${binIcon(p.bin)}
             <div class="main"><div class="title">${esc(p.bin.name)}</div>
-              <div class="sub">${p.who ? `${avatar(p.who, 18)} ${p.who === state.me ? '<b>Du bist dran</b>' : `${esc(member(p.who)?.name)} ist dran`}` : 'Niemand fest eingeteilt'}${(p.bin.members || []).length ? ` · für ${esc(binFor(p.bin))}` : ''}</div></div>
+              <div class="sub bin-who">${binWhoHtml(p)}${p.who && (p.bin.members || []).length ? ` · für ${esc(binFor(p.bin))}` : ''}</div></div>
           </div>
           <div class="confirm-row">${confirmBox(p)}</div>`).join('')}</div>`).join('') : `<div class="card empty">Keine Termine in den nächsten 6 Wochen.</div>`}` : ''}
 
@@ -1453,7 +1461,7 @@ const VIEWS = {
       ${`<div class="list card tight">${[...state.trash].filter((b) => scope === 'all' || binAppliesTo(b, state.me)).sort((a, b) => a.name.localeCompare(b.name)).map((b) => `
         <button class="list-item" data-act="bin-edit" data-id="${b.id}">
           ${binIcon(b)}
-          <div class="main"><div class="title">${esc(b.name)}</div><div class="sub">${esc(binSchedule(b))} · für ${esc(binFor(b))}${(b.rotation || []).filter(member).length ? ` · reihum: ${b.rotation.filter(member).map((id) => esc(member(id).name)).join(' → ')}` : ''}${b.importedBy ? ` · Kalender von ${esc(nameOf(b.importedBy))}` : ''}</div></div>
+          <div class="main"><div class="title">${esc(b.name)}</div><div class="sub">${esc(binSchedule(b))} · für ${esc(binFor(b))}${b.rotationSet && (b.rotation || []).filter(member).length ? ` · reihum: ${b.rotation.filter(member).map((id) => esc(member(id).name)).join(' → ')}` : ''}${b.importedBy ? ` · Kalender von ${esc(nameOf(b.importedBy))}` : ''}</div></div>
           <span class="chev">${I.chev}</span>
         </button>`).join('')}</div>`}
 
@@ -1597,8 +1605,9 @@ function taskSheet(id) {
    ═══════════════════════════════════════════════════════════════════════════ */
 function binSheet(id, preset = {}) {
   const b = id ? state.trash.find((x) => x.id === id) : null;
-  const v = b || { name: '', color: '#6b7280', mode: 'interval', start: preset.start || today(), interval: 2, dates: preset.start ? [preset.start] : [], rotation: membersSorted().map((m) => m.id) };
-  let rotation = [...(v.rotation || [])].filter(member);
+  const v = b || { name: '', color: '#6b7280', mode: 'interval', start: preset.start || today(), interval: 2, dates: preset.start ? [preset.start] : [], rotation: [] };
+  // Alte, automatisch erzeugte Reihenfolgen zählen nicht – nur bewusst festgelegte
+  let rotation = v.rotationSet ? [...(v.rotation || [])].filter(member) : [];
   let dates = [...(v.dates || [])].sort();
   let color = v.color;
   let forMembers = [...(v.members || [])].filter(member);
@@ -1609,7 +1618,7 @@ function binSheet(id, preset = {}) {
         <span class="pill">${i + 1}</span>${avatar(id, 28)}<div class="main title">${esc(member(id).name)}</div>
         <button type="button" class="icon-btn" data-rot-up="${i}" aria-label="Nach oben" ${i ? '' : 'disabled style="opacity:.3"'}>↑</button>
         <button type="button" class="icon-btn" data-rot-del="${i}" aria-label="Entfernen">${I.close}</button></div>`).join('')
-      : '<p class="small muted" style="margin:4px">Niemand eingeteilt – wer gerade Zeit hat.</p>'}
+      : '<p class="small muted" style="margin:4px">Keine feste Reihenfolge – die Tonne ist für alle, alle werden erinnert.</p>'}
       ${rest.length ? `<div class="row wrap" style="margin-top:8px">${rest.map((m) => `<button type="button" class="chip chip-glass" data-rot-add="${m.id}">${avatar(m.id, 22)}+ ${esc(m.name)}</button>`).join('')}</div>` : ''}`;
   };
   const datesHtml = () => {
@@ -1637,7 +1646,7 @@ function binSheet(id, preset = {}) {
         <div id="dates">${datesHtml()}</div>
         <p class="small muted" style="margin-top:8px">Tipp: Viele Städte bieten den Abfuhrkalender als .ics-Datei an – den kannst du unter „Kalender importieren“ einlesen.</p>
       </div>
-      <div class="field" style="margin-top:14px"><span class="label">Wer stellt raus? (reihum, in dieser Reihenfolge)</span><div id="rot">${rotHtml()}</div></div>
+      <div class="field" style="margin-top:14px"><span class="label">Feste Reihenfolge (optional) – wer stellt reihum raus?</span><div id="rot">${rotHtml()}</div></div>
       <div class="sheet-actions">
         ${b ? `<button type="button" class="btn danger" id="del">Löschen</button>` : ''}
         <button class="btn primary" type="submit">${b ? 'Speichern' : 'Hinzufügen'}</button>
@@ -1686,7 +1695,7 @@ function binSheet(id, preset = {}) {
         const data = {
           name: $('#b-name', f).value.trim(), color, mode,
           start: $('#b-start', f).value || today(), interval: +$('#b-int', f).value,
-          dates, rotation, members: forMembers,
+          dates, rotation, rotationSet: rotation.length > 0, members: forMembers,
         };
         if (!data.name) return;
         if (b) mutate('trash', b.id, (cur) => ({ ...cur, ...data }));
@@ -1725,9 +1734,9 @@ function bindForPicker(root, get, set) {
 function guessBin(summary) {
   const s = summary.toLowerCase();
   if (/bio|kompost|grün(?!.*glas)/.test(s)) return { name: 'Biotonne', color: '#8b5a2b' };
-  if (/papier|pappe|karton|ppk|blau/.test(s)) return { name: 'Papier', color: '#2f7de1' };
+  if (/papier|pappe|karton|ppk|blau/.test(s)) return { name: 'Papier', color: '#2fa84f' };
   if (/gelb|wertstoff|verpack|leichtverp|plastik/.test(s)) return { name: 'Gelber Sack', color: '#eab308' };
-  if (/glas/.test(s)) return { name: 'Glas', color: '#2fa84f' };
+  if (/glas/.test(s)) return { name: 'Glas', color: '#14b8a6' };
   if (/sperr/.test(s)) return { name: 'Sperrmüll', color: '#e5484d' };
   if (/schadstoff|problem/.test(s)) return { name: 'Schadstoffe', color: '#f08c2e' };
   if (/rest|grau|schwarz|haus/.test(s)) return { name: 'Restmüll', color: '#6b7280' };
@@ -1761,13 +1770,12 @@ function icsImport() {
       onMount: (api) => {
         bindForPicker(api.body, () => forMembers, (x) => { forMembers = x; });
         $('#go', api.el).onclick = () => {
-          const rot = forMembers.length ? forMembers : membersSorted().map((m) => m.id);
           for (const g of entries) {
             // Gleiche Tonne für denselben Personenkreis → Termine ergänzen, sonst neue Tonne
             const ex = state.trash.find((b) => b.name.toLowerCase() === g.name.toLowerCase() && sameSet(b.members || [], forMembers));
             const meta = { importedBy: state.me, importedAt: Date.now(), source: file.name };
             if (ex) mutate('trash', ex.id, (b) => ({ ...b, ...meta, mode: 'dates', dates: [...new Set([...(b.dates || []), ...g.dates])].sort() }));
-            else addDoc('trash', { name: g.name, color: g.color, mode: 'dates', dates: [...g.dates].sort(), start: today(), interval: 2, rotation: rot, members: forMembers, done: {}, createdAt: Date.now(), ...meta });
+            else addDoc('trash', { name: g.name, color: g.color, mode: 'dates', dates: [...g.dates].sort(), start: today(), interval: 2, rotation: [], rotationSet: false, members: forMembers, done: {}, createdAt: Date.now(), ...meta });
           }
           toast('✓ Abfallkalender importiert');
           api.close();
@@ -2676,7 +2684,7 @@ const ACTIONS = {
     const ps = pickups(d.v, d.v, state.binScope);
     const ev = state.feed.filter((p) => p.type === 'event' && p.event?.date === d.v);
     if (!ps.length && !ev.length) return '<p class="muted center" style="margin:4px 0 0">An diesem Tag ist noch nichts eingetragen.</p>';
-    return `<div class="list card tight">${ps.map((p) => `<div class="list-item">${binIcon(p.bin)}<div class="main"><div class="title">${esc(p.bin.name)}</div><div class="sub">${p.who ? `${esc(member(p.who)?.name)} ist dran` : ''}</div></div></div><div class="confirm-row">${confirmBox(p)}</div>`).join('')}
+    return `<div class="list card tight">${ps.map((p) => `<div class="list-item">${binIcon(p.bin)}<div class="main"><div class="title">${esc(p.bin.name)}</div><div class="sub bin-who">${binWhoHtml(p)}</div></div></div><div class="confirm-row">${confirmBox(p)}</div>`).join('')}
         ${ev.map((p) => `<div class="list-item"><span class="bin-icon" style="--c:#ff3b30">${I.cal}</span><div class="main"><div class="title">${esc(p.event.title)}</div><div class="sub">${p.event.time ? `${esc(p.event.time)} Uhr` : 'Ganztägig'}${p.event.location ? ` · ${esc(p.event.location)}` : ''}</div></div></div>`).join('')}</div>`;
     };
     openSheet({

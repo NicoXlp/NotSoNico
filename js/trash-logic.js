@@ -28,8 +28,15 @@ export function binDates(bin, from, to) {
 /** Wer ist für diesen Termin dran? memberIds = existierende Mitglieder */
 export function binWho(bin, p, memberIds) {
   if (bin.assign?.[p.date]) return bin.assign[p.date];
+  // Nur wenn jemand bewusst eine Reihenfolge festgelegt hat – sonst ist die Tonne für alle
+  if (!bin.rotationSet) return null;
   const rot = (bin.rotation || []).filter((id) => memberIds.includes(id));
   return rot.length ? rot[p.idx % rot.length] : null;
+}
+
+/** Anzeigefarbe: Papier/Pappe/Karton ist immer grün */
+export function binColorFor(bin) {
+  return /papier|pappe|karton|ppk/i.test(bin?.name || '') ? '#2fa84f' : (bin?.color || '#6b7280');
 }
 
 /** Bestätigung „rausgestellt“ → {by, at} oder null (ältere Daten speicherten nur die ID) */
