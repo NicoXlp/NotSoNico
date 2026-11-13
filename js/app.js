@@ -1,7 +1,11 @@
 import './compat.js';
 import { createStore, newId, COLLECTIONS, readLocal } from './store.js';
 import { parseICS, buildICS } from './ics.js';
-import { FIREBASE_CONFIG, VAPID_PUBLIC_KEY } from './config.js';
+import * as CONFIG from './config.js';
+// Als Namensraum importiert: fehlt ein Eintrag (z. B. ältere config.js im Zwischenspeicher), gilt er als „nicht gesetzt“
+const FIREBASE_CONFIG = CONFIG.FIREBASE_CONFIG ?? null;
+const VAPID_PUBLIC_KEY = CONFIG.VAPID_PUBLIC_KEY ?? null;
+const PUSH_WORKER_URL = CONFIG.PUSH_WORKER_URL ?? null;
 import { prepareFile, uploadMedia, loadMediaURL, cachedURL, removeMedia, MAX_ITEMS } from './media.js';
 import {
   pad, iso, parseISO, addDays, daysBetween, binDates, binWho as binWhoRaw, doneInfo, binAppliesTo,
@@ -240,13 +244,100 @@ const nameOf = (id) => (id === state.me ? 'Du' : member(id)?.name || 'Jemand');
 
 /** Neuigkeit für die Push-Mitteilungen hinterlegen (verschickt der Server alle 5 Min.).
  *  to: Empfänger-IDs oder null = alle außer mir; pref: Art (abschaltbar) */
-function emit(pref, { title, body, to = null, tab = 'home', tag } = {}) {
+async function emit(pref, { title, body, to = null, tab = 'home', tag } = {}) {
   if (store?.mode !== 'cloud' || !state.me) return;
   const id = newId();
-  store.add('events', { id, pref, actor: state.me, at: Date.now(), to, title, body: String(body || '').slice(0, 180), tab, tag: tag || `${pref}-${id}` })
-    .catch((e) => console.warn('Neuigkeit nicht gespeichert', e));
+  const ev = { id, pref, actor: state.me, at: Date.now(), to, title, body: String(body || '').slice(0, 180), tab, tag: tag || `${pref}-${id}` };
+  // 1) Sofort-Push über den Cloudflare Worker
+  if (PUSH_WORKER_URL && store.idToken) {
+    try {
+      const token = await store.idToken();
+      const res = await fetch(`${PUSH_WORKER_URL.replace(/\/$/, '')}/notify`, {
+        method: 'POST', keepalive: true,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ hid: state.hid, event: ev }),
+      });
+      if (res.ok) return;
+    } catch (e) { console.warn('Sofort-Push nicht erreichbar, nutze Ersatzweg', e); }
+  }
+  // 2) Ersatzweg: Neuigkeit ablegen, die GitHub Action verschickt sie (alle 5 Min.)
+  store.add('events', ev).catch((e) => console.warn('Neuigkeit nicht gespeichert', e));
 }
 const myName = () => me()?.name || 'Jemand';
+
+/* ─── Markieren (@Name) ──────────────────────────────────────────────────── */
+/** IDs aller Mitglieder, die im Text mit @Name markiert sind */
+function mentionIds(text) {
+  const t = String(text || '');
+  return state.members.filter((m) => t.includes('@' + m.name)).map((m) => m.id);
+}
+/** Text sicher darstellen und @Namen hervorheben (längere Namen zuerst, keine Doppelungen) */
+function richText(text) {
+  let h = esc(text);
+  const ms = [...state.members].sort((a, b) => b.name.length - a.name.length);
+  const marks = [];
+  ms.forEach((m) => {
+    const needle = '@' + esc(m.name);
+    if (!h.includes(needle)) return;
+    marks.push(`<span class="mention${m.id === state.me ? ' me' : ''}">${needle}</span>`);
+    h = h.split(needle).join(`\u0000${marks.length - 1}\u0000`);
+  });
+  return h.replace(/\u0000(\d+)\u0000/g, (_, i) => marks[+i]);
+}
+/** Vorschlagsliste an ein Eingabefeld hängen: „@“ tippen → Personen antippen */
+function attachMentions(field, triggerBtn) {
+  if (!field) return;
+  const box = document.createElement('div');
+  box.className = 'mention-box';
+  box.hidden = true;
+  field.insertAdjacentElement('afterend', box);
+  const query = () => {
+    const pos = field.selectionStart ?? field.value.length;
+    const m = field.value.slice(0, pos).match(/@([^\s@]{0,20})$/);
+    return m ? { start: pos - m[0].length, pos, q: m[1].toLowerCase() } : null;
+  };
+  const show = () => {
+    const q = query();
+    if (!q) { box.hidden = true; return; }
+    const list = membersSorted().filter((m) => m.id !== state.me && m.name.toLowerCase().startsWith(q.q));
+    if (!list.length) { box.hidden = true; return; }
+    box.innerHTML = list.map((m) => `<button type="button" data-mention="${m.id}">${avatar(m.id, 26)}<span>${esc(m.name)}</span></button>`).join('');
+    box.hidden = false;
+  };
+  field.addEventListener('input', show);
+  field.addEventListener('click', show);
+  field.addEventListener('blur', () => setTimeout(() => { box.hidden = true; }, 250));
+  box.addEventListener('pointerdown', (e) => e.preventDefault()); // Fokus im Feld lassen
+  box.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-mention]');
+    if (!b) return;
+    const m = member(b.dataset.mention);
+    const q = query() || { start: field.selectionStart, pos: field.selectionStart };
+    const ins = `@${m.name} `;
+    field.value = field.value.slice(0, q.start) + ins + field.value.slice(q.pos);
+    const c = q.start + ins.length;
+    field.focus();
+    field.setSelectionRange(c, c);
+    box.hidden = true;
+    haptic(6);
+    field.dispatchEvent(new Event('input'));
+  });
+  triggerBtn?.addEventListener('click', () => {
+    const pos = field.selectionStart ?? field.value.length;
+    const before = field.value.slice(0, pos);
+    const ins = (before && !/\s$/.test(before) ? ' @' : '@');
+    field.value = before + ins + field.value.slice(pos);
+    field.focus();
+    field.setSelectionRange(pos + ins.length, pos + ins.length);
+    show();
+  });
+}
+/** Markierte Personen benachrichtigen */
+function emitMentions(text, { exclude = [], what = 'einem Beitrag' } = {}) {
+  const ids = mentionIds(text).filter((id) => id !== state.me && !exclude.includes(id));
+  if (ids.length) emit('mention', { title: `🏷️ ${myName()} hat dich markiert`, body: `In ${what}: ${snippet(text, 110)}`, to: ids, tab: 'board' });
+  return ids;
+}
 const snippet = (t, n = 80) => { const s = String(t || '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 
 /* Optimistische Änderung: sofort lokal anzeigen, dann speichern */
@@ -831,7 +922,7 @@ function postCard(p, compact = false) {
   if (p.type === 'poll') body = pollBody(p);
   else if (p.type === 'event') body = eventBody(p);
   else if (p.type === 'voice') body = voiceBody(p);
-  else body = `${p.text ? `<div class="post-text">${esc(p.text)}</div>` : ''}${mediaGrid(p)}`;
+  else body = `${p.text ? `<div class="post-text">${richText(p.text)}</div>` : ''}${mediaGrid(p)}`;
   const last = comments[comments.length - 1];
   return `<article class="card ${past ? 'past' : ''}" data-post="${p.id}">
     <div class="post-head">
@@ -851,7 +942,7 @@ function postCard(p, compact = false) {
       <button class="act" data-act="react-pick" data-id="${p.id}" aria-label="Reagieren">${I.smile}</button>
       ${likes.length ? `<span class="spacer"></span><span class="av-stack">${likes.slice(0, 4).map((id) => avatar(id, 24)).join('')}</span>` : ''}
     </div>
-    ${!compact && last ? `<button class="last-comment" data-act="comments" data-id="${p.id}">${avatar(last.author, 22)}<span><b>${esc(member(last.author)?.name || '?')}</b>${esc(last.text.slice(0, 120))}${comments.length > 1 ? ` <span class="muted">· alle ${comments.length} ansehen</span>` : ''}</span></button>` : ''}
+    ${!compact && last ? `<button class="last-comment" data-act="comments" data-id="${p.id}">${avatar(last.author, 22)}<span><b>${esc(member(last.author)?.name || '?')}</b>${richText(last.text.slice(0, 120))}${comments.length > 1 ? ` <span class="muted">· alle ${comments.length} ansehen</span>` : ''}</span></button>` : ''}
   </article>`;
 }
 
@@ -973,7 +1064,7 @@ function voiceBody(p) {
   const v = p.voice || {};
   const peaks = v.peaks?.length ? v.peaks : Array(40).fill(0.3);
   const heard = (v.heard || []).filter((id) => id !== p.author);
-  return `${p.text ? `<div class="post-text" style="margin-bottom:10px">${esc(p.text)}</div>` : ''}
+  return `${p.text ? `<div class="post-text" style="margin-bottom:10px">${richText(p.text)}</div>` : ''}
     <div class="voice" data-voice="${p.id}">
       <button class="play" data-act="voice-play" data-id="${p.id}" aria-label="Abspielen/Pause">${I.play}</button>
       <div class="wave" data-act="voice-seek" data-id="${p.id}">${peaks.map((h) => `<i style="--h:${Math.max(0.12, h).toFixed(2)}"></i>`).join('')}</div>
@@ -1242,7 +1333,7 @@ const VIEWS = {
         return `<button class="person card" data-act="goto-person" data-id="${p.id}">
           <div class="row">${avatar(p.id, 34)}<div class="name">${esc(p.name)}</div></div>
           <div class="stat">${plural(n, 'offene Aufgabe', 'offene Aufgaben')}${od ? ` · <span style="color:var(--danger)">${od} überfällig</span>` : ''}</div>
-          ${p.id !== state.me && presenceText(p.id) ? `<div class="stat">${presenceText(p.id)}</div>` : ''}
+          <div class="stat">${p.id === state.me ? '<span class="presence">Das bist du</span>' : presenceText(p.id) || '<span class="presence">–</span>'}</div>
           <div class="meter"><i style="width:${(n / maxLoad) * 100}%"></i></div></button>`;
       }).join('')}</div>
       </div><div>
@@ -1417,6 +1508,8 @@ const VIEWS = {
 
       <h2 class="section-title">Darstellung</h2>
       ${segmented([['auto', 'Automatisch'], ['light', 'Hell'], ['dark', 'Dunkel']], theme, 'theme')}
+      <div class="label" style="margin:14px 6px 8px">Farbschema</div>
+      ${paletteHtml()}
 
       <h2 class="section-title">Privatsphäre</h2>
       ${toggle('pres-on', '🟢 Online-Status anzeigen', !presenceHidden())}
@@ -1730,10 +1823,11 @@ function composeSheet(type = 'post', existing = null, preset = {}) {
           </div>
           <p class="small muted center" id="r-hint" style="margin:10px 0 0">Tippe auf den Knopf, um aufzunehmen</p>
         </div>`}
-        <div class="field"><label for="c-vtext">Text dazu (optional)</label><input id="c-vtext" maxlength="300" placeholder="z. B. Kurze Info an alle 🙂" value="${esc(p?.type === 'voice' ? p.text || '' : '')}"></div>
+        <div class="field mention-field"><label for="c-vtext">Text dazu (optional)</label><input id="c-vtext" maxlength="300" placeholder="z. B. Kurze Info an alle 🙂" value="${esc(p?.type === 'voice' ? p.text || '' : '')}"></div>
       </div>
       <div data-k="post" ${kind === 'post' ? '' : 'hidden'}>
-        <div class="field"><label for="c-text">Beitrag</label><textarea id="c-text" maxlength="4000" placeholder="Was gibt's Neues? 😊" style="min-height:${attachments.length || pickPhotos ? 90 : 140}px">${esc(p?.text || '')}</textarea></div>
+        <div class="field mention-field"><label for="c-text">Beitrag</label><textarea id="c-text" maxlength="4000" placeholder="Was gibt's Neues? 😊 Mit @ markierst du jemanden" style="min-height:${attachments.length || pickPhotos ? 90 : 140}px">${esc(p?.text || '')}</textarea></div>
+        <button type="button" class="btn sm attach-btn" id="c-at" style="margin:-4px 0 10px">@ Person markieren</button>
         <div class="attach" id="att"></div>
         <label class="btn sm attach-btn">${I.photo}Fotos / Videos hinzufügen<input type="file" id="c-files" accept="image/*,video/*" multiple hidden></label>
         <p class="small muted" style="margin:6px 4px 12px">Bis zu ${MAX_ITEMS} Stück · Videos bis 20 MB (am besten kurze Clips)</p>
@@ -1759,6 +1853,8 @@ function composeSheet(type = 'post', existing = null, preset = {}) {
     onMount: (api) => {
       const f = $('#f', api.el);
       if (!p) recorder = setupRecorder($('[data-k=voice]', f));
+      attachMentions($('#c-text', f), $('#c-at', f));
+      attachMentions($('#c-vtext', f));
       const renderAtt = () => {
         $('#att', f).innerHTML = attachments.map((a, i) => {
           const src = a.existing ? (a.kind === 'image' ? cachedURL(a.meta.id) || a.meta.thumb : a.meta.poster) : (a.kind === 'image' ? a.preview : a.poster);
@@ -1872,15 +1968,19 @@ function composeSheet(type = 'post', existing = null, preset = {}) {
           if (!title || !date) return toast('Titel und Datum fehlen noch');
           base.event = { title, date, time: $('#c-es', f).value, endTime: $('#c-ee', f).value, location: $('#c-el', f).value.trim(), desc: $('#c-edesc', f).value.trim(), rsvp: p?.event?.rsvp || { [state.me]: 'yes' } };
         }
+        if (base.text) base.mentions = mentionIds(base.text);
         if (p) setDoc('feed', base);
         else {
           addDoc('feed', base);
           const n = myName();
+          const tagged = base.text ? emitMentions(base.text, { what: kind === 'voice' ? 'einer Sprachnachricht' : 'einem Beitrag' }) : [];
           const msg = kind === 'poll' ? { title: `📊 Neue Umfrage von ${n}`, body: base.poll.question }
             : kind === 'event' ? { title: `📅 ${n} hat ein Ereignis geplant`, body: `${base.event.title} · ${fmtDay(base.event.date)}${base.event.time ? `, ${base.event.time} Uhr` : ''}` }
             : kind === 'voice' ? { title: `🎤 Sprachnachricht von ${n}`, body: base.text || `${fmtDur(base.voice.duration)} anhören` }
             : { title: `📌 Neuer Beitrag von ${n}`, body: base.text || (base.media?.length ? `${base.media.length === 1 ? (base.media[0].kind === 'video' ? 'Ein Video' : 'Ein Foto') : `${base.media.length} Fotos/Videos`} 📷` : '') };
-          emit('post_new', { ...msg, body: snippet(msg.body), tab: 'board' });
+          // Markierte bekommen die Markierungs-Mitteilung statt der allgemeinen
+          const others = state.members.map((m) => m.id).filter((id) => id !== state.me && !tagged.includes(id));
+          if (others.length) emit('post_new', { ...msg, body: snippet(msg.body), tab: 'board', to: others });
         }
         haptic(12);
         toast(p ? 'Gespeichert' : '✓ Veröffentlicht');
@@ -1910,14 +2010,14 @@ function commentsSheet(id) {
     if (!p) return '<p class="muted">Beitrag wurde gelöscht.</p>';
     const cs = p.comments || [];
     return cs.length ? cs.map((c) => `<div class="comment">${avatar(c.author, 32)}<div style="min-width:0;flex:1">
-        <div class="bubble"><div class="who">${esc(member(c.author)?.name || '?')}</div><div class="txt">${esc(c.text)}</div></div>
+        <div class="bubble"><div class="who">${esc(member(c.author)?.name || '?')}</div><div class="txt">${richText(c.text)}</div></div>
         <div class="meta"><span>${relTime(c.at)}</span>${c.author === state.me ? `<button data-cdel="${c.id}">Löschen</button>` : ''}</div></div></div>`).join('')
       : '<div class="empty"><div class="big">💬</div>Noch keine Kommentare. Schreib den ersten!</div>';
   };
   openSheet({
     title: 'Kommentare',
     html: `<div id="clist">${listHtml()}</div>
-      <form class="composer" id="cf"><textarea id="ct" rows="1" maxlength="1000" placeholder="Kommentieren …" aria-label="Kommentar"></textarea><button class="send" aria-label="Senden">${I.send}</button></form>`,
+      <form class="composer mention-field" id="cf"><textarea id="ct" rows="1" maxlength="1000" placeholder="Kommentieren …" aria-label="Kommentar"></textarea><button class="send" aria-label="Senden">${I.send}</button></form>`,
     refresh: (api) => {
       const l = $('#clist', api.el);
       const atBottom = api.body.scrollHeight - api.body.scrollTop - api.body.clientHeight < 40;
@@ -1926,6 +2026,7 @@ function commentsSheet(id) {
     },
     onMount: (api) => {
       const ta = $('#ct', api.el);
+      attachMentions(ta);
       setTimeout(() => { api.body.scrollTop = api.body.scrollHeight; }, 50);
       ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = Math.min(140, ta.scrollHeight) + 'px'; });
       ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && matchMedia('(hover: hover)').matches) { e.preventDefault(); $('#cf', api.el).requestSubmit(); } });
@@ -1940,6 +2041,7 @@ function commentsSheet(id) {
         if (post && post.author !== state.me) {
           emit('social', { title: `💬 ${myName()} hat kommentiert`, body: snippet(text, 120), to: [post.author], tab: 'board', tag: `comment-${id}` });
         }
+        emitMentions(text, { exclude: post && post.author !== state.me ? [post.author] : [], what: 'einem Kommentar' });
         setTimeout(() => { api.body.scrollTop = api.body.scrollHeight; }, 80);
       };
       $('#clist', api.el).addEventListener('click', async (e) => {
@@ -2022,12 +2124,55 @@ function notifyCard() {
     <span class="chev">${I.chev}</span></button>`;
 }
 
+/** Betriebssystem & Browser erkennen (für passende Hilfetexte) */
+function browserInfo() {
+  const ua = navigator.userAgent;
+  const os = isIOS() ? (/iPad|Macintosh/.test(ua) ? 'iPadOS' : 'iOS') : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Mac/.test(ua) ? 'macOS' : 'Linux';
+  const b = /OPR\/|OPT\/|OPX\/|Opera/.test(ua) ? 'Opera' : /SamsungBrowser/.test(ua) ? 'Samsung Internet' : /EdgA?\//.test(ua) ? 'Edge'
+    : /Firefox|FxiOS/.test(ua) ? 'Firefox' : /CriOS|Chrome\//.test(ua) ? 'Chrome' : /Safari/.test(ua) ? 'Safari' : 'Browser';
+  return { os, b };
+}
+/** So erlaubt man Mitteilungen nachträglich – je nach Gerät und Browser */
+function permissionHelp() {
+  const { os, b } = browserInfo();
+  if (os === 'iOS' || os === 'iPadOS') return '<b>Einstellungen</b> → <b>Mitteilungen</b> → <b>Vermietertagebuch</b> → „Mitteilungen erlauben“ einschalten.';
+  if (os === 'Android') {
+    if (b === 'Opera') return 'In Opera: <b>Einstellungen</b> → <b>Website-Einstellungen</b> → <b>Benachrichtigungen</b> → diese Seite erlauben. Klappt es dort nicht, die App bitte in <b>Chrome</b> öffnen und dort installieren (⋮ → „App installieren“).';
+    if (b === 'Samsung Internet') return 'In Samsung Internet: <b>≡</b> → <b>Einstellungen</b> → <b>Websites und Downloads</b> → <b>Benachrichtigungen</b> → diese Seite erlauben.';
+    if (b === 'Firefox') return 'In Firefox: auf das <b>Schloss</b> links neben der Adresse tippen → <b>Benachrichtigungen</b> → erlauben.';
+    return 'In Chrome: links neben der Adresse auf das <b>Einstellungs-Symbol</b> tippen → <b>Berechtigungen</b> → <b>Benachrichtigungen</b> → „Zulassen“. Als installierte App: Android-<b>Einstellungen</b> → <b>Apps</b> → <b>Vermietertagebuch</b> → <b>Benachrichtigungen</b> → an.';
+  }
+  if (b === 'Safari') return 'In Safari: <b>Safari</b> → <b>Einstellungen</b> → <b>Websites</b> → <b>Mitteilungen</b> → diese Seite auf „Erlauben“.';
+  if (b === 'Firefox') return 'In Firefox: auf das <b>Schloss</b> links neben der Adresse klicken → Berechtigungen → <b>Benachrichtigungen</b> erlauben.';
+  return `In ${b}: auf das <b>Schloss-/Regler-Symbol</b> links neben der Adresse klicken → <b>Benachrichtigungen</b> → „Zulassen“. Danach die Seite neu laden.`;
+}
+/** Technische Übersicht – hilft beim Fehlersuchen (z. B. Screenshot schicken) */
+async function pushDiagnose() {
+  const { os, b } = browserInfo();
+  let subOk = false;
+  try { subOk = !!(await (await navigator.serviceWorker?.getRegistration())?.pushManager?.getSubscription()); } catch { /* egal */ }
+  const row = (k, v, ok) => `<div class="diag-row"><span>${k}</span><b class="${ok === true ? 'ok' : ok === false ? 'bad' : ''}">${v}</b></div>`;
+  const perm = typeof Notification === 'undefined' ? 'nicht vorhanden' : { granted: 'erlaubt', denied: 'blockiert', default: 'noch nicht gefragt' }[Notification.permission];
+  return [
+    row('Gerät / Browser', `${os} · ${b}${isStandalone() ? ' · als App' : ''}`),
+    row('Mitteilungen', perm, typeof Notification !== 'undefined' ? Notification.permission === 'granted' : false),
+    row('Push-Technik', 'PushManager' in window && 'serviceWorker' in navigator ? 'vorhanden' : 'fehlt', 'PushManager' in window),
+    row('Push-Abo dieses Geräts', subOk ? 'aktiv' : 'keins', subOk),
+    row('Zustellung', PUSH_WORKER_URL ? 'sofort' : 'alle 5 Minuten'),
+    LS.get('pushError') ? row('Letzter Fehler', esc(LS.get('pushError')), false) : '',
+  ].join('');
+}
+
 function pushStatus() {
+  const { os, b } = browserInfo();
+  if (os === 'Android' && b === 'Opera') {
+    return `<div class="banner">🧭 <span><b>Tipp für Opera:</b> Push-Mitteilungen funktionieren in Opera auf Android oft nicht zuverlässig. Am besten den Einladungslink in <b>Chrome</b> öffnen und die App dort installieren (⋮ → „App installieren“).</span></div>`;
+  }
   if (isIOS() && !isStandalone()) {
     return `<div class="banner">📱 <span>Auf iPhone/iPad gibt es Mitteilungen nur, wenn die App auf dem Home-Bildschirm ist: <b>Teilen</b> → <b>„Zum Home-Bildschirm“</b>, dann die App von dort öffnen (ab iOS 16.4).</span></div>`;
   }
   if (!hasNotif()) return '<div class="banner">⚠️ <span>Dieser Browser unterstützt leider keine Mitteilungen.</span></div>';
-  if (Notification.permission === 'denied') return '<div class="banner">🔕 <span>Mitteilungen sind für diese App blockiert. Bitte in den Browser-/Systemeinstellungen erlauben.</span></div>';
+  if (Notification.permission === 'denied') return `<div class="banner">🔕 <span>Mitteilungen sind für diese App blockiert. So erlaubst du sie: ${permissionHelp()}</span></div>`;
   if (store?.mode !== 'cloud') return '<div class="banner">☁️ <span>Im lokalen Modus erinnert die App nur, solange sie geöffnet ist. Für echte Push-Mitteilungen bitte die Synchronisierung einrichten.</span></div>';
   if (!vapidKey()) return '<div class="banner">🛠️ <span>Der Push-Versand ist noch nicht eingerichtet (README → „Push“). Bis dahin erinnert die App, solange sie geöffnet ist.</span></div>';
   return LS.get('pushActive') ? '<div class="banner" style="background:color-mix(in srgb,var(--success) 16%,transparent)">✅ <span>Push ist auf diesem Gerät aktiv – auch wenn die App geschlossen ist.</span></div>' : '';
@@ -2053,6 +2198,7 @@ function notifySheet() {
           <p class="small muted" style="margin:2px 4px 0">„Meine Tonnen“ = alle, die für dich oder das ganze Haus gelten.</p></div>
         ${toggle('n-follow', '⏰ Nachfassen, wenn noch niemand „rausgestellt“ bestätigt hat', pr.followUp)}
         <div class="field" id="n-fh-wrap" ${pr.followUp ? '' : 'hidden'}><label for="n-fh">Nachfassen um</label><select id="n-fh">${hours(pr.followHour, 6, 23)}</select></div>
+        <details class="diag"><summary>🔧 Technische Details (bei Problemen)</summary><div id="n-diag" class="small"></div></details>
         <div class="sheet-actions">
           <button type="button" class="btn" id="n-test">${I.bell}Test</button>
           <button class="btn primary" type="submit">Speichern</button>
@@ -2072,6 +2218,7 @@ function notifySheet() {
         val[seg.parentElement.id === 'n-when' ? 'when' : 'mode'] = b.dataset.v;
       });
       $('#n-follow', f).onchange = (e) => { $('#n-fh-wrap', f).hidden = !e.target.checked; };
+      pushDiagnose().then((h) => { const d = $('#n-diag', f); if (d) d.innerHTML = h; });
       $('#n-test', f).onclick = async () => {
         if (!hasNotif()) return toast('Mitteilungen werden hier nicht unterstützt');
         if ((await Notification.requestPermission()) !== 'granted') return toast('🔕 Mitteilungen wurden nicht erlaubt');
@@ -2109,17 +2256,52 @@ async function savePushPrefs(prefs) {
     return true;
   }
   if (!hasNotif()) { toast(isIOS() ? 'Bitte erst zum Home-Bildschirm hinzufügen 📱' : 'Mitteilungen werden hier nicht unterstützt', 4000); return false; }
-  const perm = await Notification.requestPermission();
-  if (perm !== 'granted') { toast('🔕 Ohne Erlaubnis kann ich dich leider nicht erinnern', 4000); return false; }
+  let perm = Notification.permission;
+  if (perm !== 'granted') {
+    try {
+      // ältere Browser kennen nur die Rückruf-Variante
+      perm = await new Promise((res) => { const p = Notification.requestPermission(res); if (p?.then) p.then(res); });
+    } catch { perm = Notification.permission; }
+  }
+  if (perm !== 'granted') {
+    LS.set('pushError', perm === 'denied' ? 'Erlaubnis abgelehnt/blockiert' : 'Erlaubnis-Abfrage nicht beantwortet');
+    showPushHelp(perm);
+    return false;
+  }
   try {
     const active = await syncPushSub(true);
+    LS.del('pushError');
     toast(active ? '🔔 Push-Mitteilungen aktiv!' : '🔔 Erinnerungen aktiv (solange die App offen ist)', 3500);
   } catch (e) {
     console.error(e);
-    toast('⚠️ Push konnte nicht aktiviert werden – Erinnerung nur bei offener App', 4500);
+    const msg = `${e?.name || 'Fehler'}: ${e?.message || e}`.slice(0, 160);
+    LS.set('pushError', msg);
+    const { b } = browserInfo();
+    const noService = /push service|AbortError|not supported|NotSupported|registration/i.test(msg);
+    openSheet({
+      title: 'Push klappt hier noch nicht',
+      html: `<p style="margin-top:0">${noService
+        ? `Dieser Browser (${esc(b)}) konnte keine Verbindung zu seinem Push-Dienst herstellen. Das passiert z. B. in Opera oder in Browsern ohne Google-Dienste.`
+        : 'Beim Einrichten der Push-Mitteilungen ist ein Fehler aufgetreten.'}</p>
+        <p class="muted small">Am zuverlässigsten: <b>Chrome</b> auf Android, <b>Safari</b> (Home-Bildschirm-App) auf iPhone/iPad, Chrome/Edge/Firefox/Safari am Computer.</p>
+        <p class="small muted">Technische Meldung: <code>${esc(msg)}</code></p>
+        <div class="sheet-actions"><button class="btn primary" data-close>Okay</button></div>`,
+    });
   }
   checkLocalReminders();
   return true;
+}
+
+function showPushHelp(perm) {
+  openSheet({
+    title: perm === 'denied' ? 'Mitteilungen sind blockiert' : 'Erlaubnis fehlt noch',
+    html: `<p style="margin-top:0">${perm === 'denied'
+      ? 'Mitteilungen wurden für diese App abgelehnt. Der Browser fragt dann nicht noch einmal – du kannst sie aber jederzeit selbst erlauben:'
+      : 'Die Abfrage wurde geschlossen oder vom Browser still blockiert (in Chrome erscheint dann eine durchgestrichene Glocke 🔕 in der Adresszeile). So erlaubst du Mitteilungen:'}</p>
+      <div class="banner" style="background:var(--fill)"><span>${permissionHelp()}</span></div>
+      <p class="small muted">Danach hier noch einmal „Speichern“ tippen.</p>
+      <div class="sheet-actions"><button class="btn primary" data-close>Verstanden</button></div>`,
+  });
 }
 
 /** Push-Abo beim Server (Firestore „subs“) anlegen/aktualisieren. Gibt true zurück, wenn Server-Push aktiv ist. */
@@ -2528,6 +2710,7 @@ const ACTIONS = {
   'member-new': () => memberSheet(null),
   'member-edit': (d) => memberSheet(d.id),
   theme: (d) => { LS.set('theme', d.v); applyTheme(); renderNow(false); },
+  palette: (d) => { LS.set('palette', d.v); applyPalette(); haptic(8); renderNow(false); },
   cloud: () => cloudSheet(),
   'copy-invite': async () => {
     try { await navigator.clipboard.writeText(inviteLink()); toast('🔗 Einladungslink kopiert'); } catch { prompt('Einladungslink:', inviteLink()); }
@@ -2570,10 +2753,57 @@ document.addEventListener('click', (e) => {
 /* ═══════════════════════════════════════════════════════════════════════════
    Onboarding
    ═══════════════════════════════════════════════════════════════════════════ */
+/* ─── Farbschemata ────────────────────────────────────────────────────────
+   accent/accent2: Akzentfarben (hell, dunkel), light/dark: die vier Hintergrund-Farbflecken */
+const PALETTES = {
+  indigo: { name: 'Indigo', accent: ['#0a7cff', '#3d9bff'], accent2: ['#5e5ce6', '#7d7aff'],
+    light: ['#7cc4ff', '#ffb1d6', '#b9a7ff', '#ffd89a'], dark: ['#1f5fd1', '#a8326e', '#5a3fd1', '#b8701a'] },
+  ocean: { name: 'Ozean', accent: ['#0891b2', '#22c3e6'], accent2: ['#0f766e', '#2dd4bf'],
+    light: ['#7dd3fc', '#99f6e4', '#a5b4fc', '#bae6fd'], dark: ['#0c4a6e', '#115e59', '#1e3a8a', '#155e75'] },
+  sunset: { name: 'Sonnenuntergang', accent: ['#ea580c', '#fb8c3c'], accent2: ['#db2777', '#f472b6'],
+    light: ['#fdba74', '#f9a8d4', '#fca5a5', '#fde68a'], dark: ['#9a3412', '#9d174d', '#7f1d1d', '#92400e'] },
+  forest: { name: 'Wald', accent: ['#16a34a', '#34d36e'], accent2: ['#65a30d', '#a3e635'],
+    light: ['#86efac', '#d9f99d', '#a7f3d0', '#fde68a'], dark: ['#14532d', '#3f6212', '#065f46', '#713f12'] },
+  rose: { name: 'Rosé', accent: ['#e11d74', '#f472b6'], accent2: ['#a855f7', '#c084fc'],
+    light: ['#fbcfe8', '#f5d0fe', '#fecdd3', '#ddd6fe'], dark: ['#831843', '#701a75', '#881337', '#4c1d95'] },
+  graphite: { name: 'Graphit', accent: ['#3f3f46', '#d4d4d8'], accent2: ['#52525b', '#a1a1aa'],
+    light: ['#d4d4d8', '#e4e4e7', '#cbd5e1', '#e7e5e4'], dark: ['#27272a', '#3f3f46', '#1e293b', '#292524'] },
+};
+const isDark = () => {
+  const t = LS.get('theme', 'auto');
+  return t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+};
+function applyPalette() {
+  const key = LS.get('palette', 'indigo');
+  const custom = LS.get('accentCustom', null);
+  const p = PALETTES[key] || PALETTES.indigo;
+  const d = isDark() ? 1 : 0;
+  const st = document.documentElement.style;
+  const accent = key === 'custom' && custom ? custom : p.accent[d];
+  st.setProperty('--accent', accent);
+  st.setProperty('--accent-2', key === 'custom' && custom ? `color-mix(in srgb, ${custom} 70%, #7d7aff)` : p.accent2[d]);
+  const blobs = key === 'custom' && custom
+    ? [custom, `color-mix(in srgb, ${custom} 55%, ${d ? '#000' : '#fff'})`, `color-mix(in srgb, ${custom} 60%, #ff7ab6)`, `color-mix(in srgb, ${custom} 50%, #ffd27a)`]
+    : p[d ? 'dark' : 'light'];
+  blobs.forEach((c, i) => st.setProperty(`--blob-${i + 1}`, c));
+}
 function applyTheme() {
   const t = LS.get('theme', 'auto');
   if (t === 'auto') document.documentElement.removeAttribute('data-theme');
   else document.documentElement.dataset.theme = t;
+  applyPalette();
+}
+function paletteHtml() {
+  const cur = LS.get('palette', 'indigo');
+  const d = isDark() ? 1 : 0;
+  return `<div class="palettes">${Object.entries(PALETTES).map(([k, p]) => `
+    <button class="palette ${cur === k ? 'on' : ''}" data-act="palette" data-v="${k}" aria-label="Farbschema ${p.name}">
+      <span class="pal-swatch" style="background:linear-gradient(135deg, ${p[d ? 'dark' : 'light'][0]}, ${p[d ? 'dark' : 'light'][1]} 55%, ${p[d ? 'dark' : 'light'][2]})"><i style="background:${p.accent[d]}"></i></span>
+      <span>${p.name}</span></button>`).join('')}
+    <label class="palette ${cur === 'custom' ? 'on' : ''}" aria-label="Eigene Farbe">
+      <span class="pal-swatch custom" style="${LS.get('accentCustom') ? `background:${esc(LS.get('accentCustom'))}` : ''}"><input type="color" id="pal-custom" value="${esc(LS.get('accentCustom', '#7c5cff'))}"></span>
+      <span>Eigene</span></label>
+  </div>`;
 }
 
 const LOGO = `<div class="logo"><img src="icons/icon.svg?v=3" alt=""></div>`;
@@ -2840,5 +3070,12 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pagehide', () => beat(false));
 setInterval(() => { if (!document.hidden) beat(true); if (state.ready && presenceChanged()) render(); }, 60000);
 document.addEventListener('change', (e) => { if (e.target.id === 'pres-on') setPresenceVisible(e.target.checked); });
+document.addEventListener('input', (e) => {
+  if (e.target.id !== 'pal-custom') return;
+  LS.set('accentCustom', e.target.value);
+  LS.set('palette', 'custom');
+  applyPalette();
+});
+document.addEventListener('change', (e) => { if (e.target.id === 'pal-custom') renderNow(false); });
 
 boot();

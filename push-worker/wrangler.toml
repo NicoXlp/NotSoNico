@@ -1,0 +1,13 @@
+# Cloudflare Worker für sofortige Push-Mitteilungen (Bereitstellung per GitHub Action)
+name = "vermietertagebuch-push"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+workers_dev = true
+
+[vars]
+FIREBASE_PROJECT_ID = "vermietertagebuch-d258b"
+VAPID_PUBLIC_KEY = "BOXqILMyroyP1ncj5lTsN-C4yZmwPvyvNAKweRsGKQce3htDmYGOCpbJh84rZUififSUPcwxpd26j1R42tEaXy4"
+VAPID_SUBJECT = "https://nicoxlp.github.io/Vermietertagebuch-App/"
+ALLOWED_ORIGINS = "https://nicoxlp.github.io"
+
+# VAPID_PRIVATE_KEY kommt als Secret aus GitHub (siehe .github/workflows/push-worker.yml)

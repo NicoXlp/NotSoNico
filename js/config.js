@@ -36,3 +36,10 @@ export const FIREBASE_CONFIG = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const VAPID_PUBLIC_KEY = "BOXqILMyroyP1ncj5lTsN-C4yZmwPvyvNAKweRsGKQce3htDmYGOCpbJh84rZUififSUPcwxpd26j1R42tEaXy4";
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Sofort-Push (optional): Adresse des Cloudflare Workers aus push-worker/
+//  Ohne Eintrag verschickt die GitHub Action die Mitteilungen alle 5 Minuten.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const PUSH_WORKER_URL = null;

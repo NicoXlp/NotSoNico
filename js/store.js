@@ -75,9 +75,12 @@ class CloudStore {
     } catch {
       this.db = fs.getFirestore(app);
     }
-    await auth.signInAnonymously(auth.getAuth(app));
+    this.auth = auth.getAuth(app);
+    await auth.signInAnonymously(this.auth);
     return this;
   }
+  /** Anmelde-Token (für den Sofort-Push-Dienst) */
+  async idToken() { return this.auth?.currentUser?.getIdToken(); }
   _c(c) { return this.fs.collection(this.db, 'households', this.hid, c); }
   _d(c, id) { return this.fs.doc(this.db, 'households', this.hid, c, id); }
   subscribe(c, f) {
