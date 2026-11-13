@@ -722,6 +722,8 @@ function renderNow(animate) {
   ensureDmSub();
   const v = $('#view');
   v.innerHTML = VIEWS[state.tab]();
+  const ns = $('.news-scroll', v);
+  if (ns && newsScrollTop) { ns.scrollTop = newsScrollTop; ns.classList.toggle('more', ns.scrollTop + ns.clientHeight < ns.scrollHeight - 4); }
   syncTabbar();
   updateVoiceUI();
   hydrateMedia();
@@ -1425,16 +1427,26 @@ const NEWS = [
     ],
   },
 ];
+/** Kachel „Neues“: neueste Meldung oben, ältere darunter – in der Kachel scrollbar */
 function newsCard() {
-  const n = NEWS[0];
-  if (!n) return '';
+  if (!NEWS.length) return '';
+  const entry = (n, i) => `<div class="news-entry">
+      <div class="news-meta"><span class="news-badge ${i ? 'old' : ''}">${esc(n.label || '✨ Neu')}</span><span class="small muted">${esc(fmt(n.date, { day: 'numeric', month: 'long' }))}</span></div>
+      <div class="news-list">${n.items.map((it) => `<div class="news-item"><span class="news-ico">${it.icon}</span>
+        <div class="main"><div class="title">${esc(it.title)}</div><div class="small muted">${esc(it.text)}</div>
+        ${it.act ? `<button class="link news-btn" data-act="${it.act}" ${it.v ? `data-v="${it.v}"` : ''}>${esc(it.btn)} ›</button>` : ''}</div></div>`).join('')}</div>
+    </div>`;
   return `<section class="card news-card">
-    <div class="news-head"><span class="news-badge">${esc(n.label || '✨ Neu')}</span><h2>Neues</h2><span class="small muted">${esc(fmt(n.date, { day: 'numeric', month: 'long' }))}</span></div>
-    <div class="news-list">${n.items.map((it) => `<div class="news-item"><span class="news-ico">${it.icon}</span>
-      <div class="main"><div class="title">${esc(it.title)}</div><div class="small muted">${esc(it.text)}</div>
-      ${it.act ? `<button class="link news-btn" data-act="${it.act}" ${it.v ? `data-v="${it.v}"` : ''}>${esc(it.btn)} ›</button>` : ''}</div></div>`).join('')}</div>
+    <div class="news-head"><h2>Neues</h2>${NEWS.length > 1 ? `<span class="small muted">${NEWS.length} Updates · scrollen für ältere</span>` : ''}</div>
+    <div class="news-scroll ${NEWS.length > 1 ? 'more' : ''}" tabindex="0" aria-label="Neuigkeiten">${NEWS.map(entry).join('')}</div>
   </section>`;
 }
+// Schatten unten ausblenden, sobald man ganz unten angekommen ist
+document.addEventListener('scroll', (e) => {
+  const el = e.target;
+  if (el?.classList?.contains('news-scroll')) { newsScrollTop = el.scrollTop; el.classList.toggle('more', el.scrollTop + el.clientHeight < el.scrollHeight - 4); }
+}, true);
+let newsScrollTop = 0;
 
 const VIEWS = {
   home() {
