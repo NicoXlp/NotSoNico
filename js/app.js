@@ -272,8 +272,12 @@ const myName = () => me()?.name || 'Jemand';
 
 /* ─── Markieren (@Name) ──────────────────────────────────────────────────── */
 /** IDs aller Mitglieder, die im Text mit @Name markiert sind */
+/** @everyone markiert alle im Haus */
+const EVERYONE_RE = /@everyone\b/i;
+const mentionsEveryone = (text) => EVERYONE_RE.test(String(text || ''));
 function mentionIds(text) {
   const t = String(text || '');
+  if (mentionsEveryone(t)) return state.members.map((m) => m.id);
   return state.members.filter((m) => t.includes('@' + m.name)).map((m) => m.id);
 }
 /** Text sicher darstellen und @Namen hervorheben (längere Namen zuerst, keine Doppelungen) */
@@ -287,6 +291,7 @@ function richText(text) {
     marks.push(`<span class="mention${m.id === state.me ? ' me' : ''}">${needle}</span>`);
     h = h.split(needle).join(`\u0000${marks.length - 1}\u0000`);
   });
+  h = h.replace(/@everyone\b/gi, () => { marks.push('<span class="mention all me" title="Alle im Haus">@everyone</span>'); return `\u0000${marks.length - 1}\u0000`; });
   return h.replace(/\u0000(\d+)\u0000/g, (_, i) => marks[+i]);
 }
 /** Vorschlagsliste an ein Eingabefeld hängen: „@“ tippen → Personen antippen */
@@ -305,8 +310,10 @@ function attachMentions(field, triggerBtn) {
     const q = query();
     if (!q) { box.hidden = true; return; }
     const list = membersSorted().filter((m) => m.id !== state.me && m.name.toLowerCase().startsWith(q.q));
-    if (!list.length) { box.hidden = true; return; }
-    box.innerHTML = list.map((m) => `<button type="button" data-mention="${m.id}">${avatar(m.id, 26)}<span>${esc(m.name)}</span></button>`).join('');
+    const all = 'everyone'.startsWith(q.q) || 'alle'.startsWith(q.q);
+    if (!list.length && !all) { box.hidden = true; return; }
+    box.innerHTML = (all ? `<button type="button" data-mention="everyone"><span class="av everyone-av" style="--s:26px">📣</span><span><b>@everyone</b> <small class="muted">· alle im Haus</small></span></button>` : '')
+      + list.map((m) => `<button type="button" data-mention="${m.id}">${avatar(m.id, 26)}<span>${esc(m.name)}</span></button>`).join('');
     box.hidden = false;
   };
   field.addEventListener('input', show);
@@ -316,7 +323,7 @@ function attachMentions(field, triggerBtn) {
   box.addEventListener('click', (e) => {
     const b = e.target.closest('[data-mention]');
     if (!b) return;
-    const m = member(b.dataset.mention);
+    const m = b.dataset.mention === 'everyone' ? { name: 'everyone' } : member(b.dataset.mention);
     const q = query() || { start: field.selectionStart, pos: field.selectionStart };
     const ins = `@${m.name} `;
     field.value = field.value.slice(0, q.start) + ins + field.value.slice(q.pos);
@@ -340,7 +347,8 @@ function attachMentions(field, triggerBtn) {
 /** Markierte Personen benachrichtigen */
 function emitMentions(text, { exclude = [], what = 'einem Beitrag' } = {}) {
   const ids = mentionIds(text).filter((id) => id !== state.me && !exclude.includes(id));
-  if (ids.length) emit('mention', { title: `🏷️ ${myName()} hat dich markiert`, body: `In ${what}: ${snippet(text, 110)}`, to: ids, tab: 'board' });
+  const everyone = mentionsEveryone(text);
+  if (ids.length) emit('mention', { title: everyone ? `📣 ${myName()} an alle (@everyone)` : `🏷️ ${myName()} hat dich markiert`, body: `In ${what}: ${snippet(text, 110)}`, to: ids, tab: 'board' });
   return ids;
 }
 const snippet = (t, n = 80) => { const s = String(t || '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
