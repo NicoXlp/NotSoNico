@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Vermietertagebuch</title>
+  <meta name="description" content="Die App für eure Hausgemeinschaft: Aufgaben, Müllabfuhr, Pinnwand, Umfragen und Ereignisse.">
+  <meta name="theme-color" content="#eef1f8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0b0d14" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Vermietertagebuch">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Farbiger, sanft bewegter Hintergrund – damit das Glas etwas zum Brechen hat -->
+  <div class="backdrop" aria-hidden="true">
+    <span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span><span class="blob b4"></span>
+  </div>
+
+  <!-- SVG-Filter für die Lichtbrechung der Liquid-Glass-Linse (nur Chromium unterstützt das als backdrop-filter) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <filter id="lg-refract" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.008 0.012" numOctaves="2" seed="7" result="noise"/>
+      <feGaussianBlur in="noise" stdDeviation="2" result="soft"/>
+      <feDisplacementMap in="SourceGraphic" in2="soft" scale="38" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </svg>
+
+  <main id="app">
+    <div id="view" class="view"></div>
+  </main>
+
+  <div class="dock" id="dock" hidden>
+    <nav class="tabbar glass" id="tabbar" aria-label="Navigation">
+      <div class="lens" id="lens" aria-hidden="true"></div>
+    </nav>
+    <button class="fab glass" id="fab" aria-label="Neu erstellen"></button>
+  </div>
+
+  <div id="toasts" aria-live="polite"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

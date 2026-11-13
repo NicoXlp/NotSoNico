@@ -1,0 +1,26 @@
+name: Müll-Erinnerungen
+
+on:
+  schedule:
+    - cron: '7 * * * *'   # stündlich (GitHub startet geplante Läufe manchmal ein paar Minuten später)
+  workflow_dispatch:
+
+jobs:
+  send:
+    # Läuft erst, wenn unter Settings → Secrets and variables → Actions → Variables
+    # die Variable PUSH_ENABLED = true angelegt ist (spart sonst Actions-Minuten).
+    if: ${{ vars.PUSH_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --omit=dev --no-audit --no-fund
+      - run: node scripts/send-reminders.mjs
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
