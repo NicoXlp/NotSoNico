@@ -2816,6 +2816,8 @@ function applyPalette() {
     ? [custom, `color-mix(in srgb, ${custom} 55%, ${d ? '#000' : '#fff'})`, `color-mix(in srgb, ${custom} 60%, #ff7ab6)`, `color-mix(in srgb, ${custom} 50%, #ffd27a)`]
     : p[d ? 'dark' : 'light'];
   blobs.forEach((c, i) => st.setProperty(`--blob-${i + 1}`, c));
+  // Für die Startanimation merken (wird beim nächsten Start sofort im HTML genutzt)
+  LS.set('splash', { accent: btn.bg, fg: btn.fg, blobs: blobs.slice(0, 3) });
 }
 function applyTheme() {
   const t = LS.get('theme', 'auto');
@@ -3053,6 +3055,16 @@ async function connect(hid, { create } = {}) {
 }
 const pending = { tab: null, done: null };
 
+/* ─── Startanimation ─────────────────────────────────────────────────────── */
+function hideSplash(now = false) {
+  const el = document.getElementById('splash');
+  if (!el || el.classList.contains('out')) return;
+  const min = matchMedia('(prefers-reduced-motion: reduce)').matches ? 400 : 2300; // ab Seitenstart gezählt
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 500); }, now ? 0 : Math.max(0, min - performance.now()));
+}
+document.getElementById('splash')?.addEventListener('click', () => hideSplash(true));
+setTimeout(() => hideSplash(true), 7000); // Sicherheitsnetz
+
 async function boot() {
   applyTheme();
   matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => applyTheme());
@@ -3074,8 +3086,9 @@ async function boot() {
   if (url.search) history.replaceState(null, '', url.pathname);
 
   const hid = LS.get('house');
-  if (!hid) return showWelcome();
+  if (!hid) { showWelcome(); hideSplash(); return; }
   try { await connect(hid); } catch (e) { console.error(e); if (cloudConfig()) showCloudError(e, hid); else showWelcome(); }
+  hideSplash();
 }
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
