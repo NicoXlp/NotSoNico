@@ -156,6 +156,7 @@ const state = {
   house: null,
   members: [], tasks: [], feed: [], trash: [],
   loaded: new Set(),
+  synced: new Set(), // Sammlungen, die wirklich vom Server (nicht nur aus dem Zwischenspeicher) kamen
   me: null,
   tab: LS.get('tab', 'home'),
   taskView: 'open',
@@ -2618,18 +2619,49 @@ function showWelcome() {
 }
 
 function whoAreYou(switching = false) {
-  const people = membersSorted();
+  const synced = () => state.synced.has('members');
+  const pickHtml = () => {
+    const people = membersSorted();
+    if (!people.length) {
+      return synced()
+        ? '<p class="muted center" style="margin:0">Noch niemand im Haus – du bist die erste Person! Erstelle unten dein Profil.</p>'
+        : '<div class="center" style="padding:10px 0"><div class="spinner" style="margin:0 auto 10px"></div><p class="small muted" style="margin:0">Profile werden geladen …</p></div>';
+    }
+    return `<div class="profile-pick">${people.map((p) => `<button data-pick="${p.id}" class="${p.id === state.me ? 'on' : ''}">${avatar(p.id, 56)}<span>${esc(p.name)}</span>${presenceText(p.id) && p.id !== state.me ? `<span class="small">${presenceText(p.id)}</span>` : ''}</button>`).join('')}</div>`;
+  };
   const s = openSheet({
-    title: people.length ? 'Wer bist du?' : 'Erstelle dein Profil',
-    html: `${people.length ? `<p class="muted" style="margin-top:0">Wähle dein Profil auf diesem Gerät:</p>
-      <div class="profile-pick">${people.map((p) => `<button data-pick="${p.id}">${avatar(p.id, 56)}<span>${esc(p.name)}</span></button>`).join('')}</div>
-      <div class="divider">oder neu dazukommen</div>` : '<p class="muted" style="margin-top:0">Wie sollen dich die anderen sehen?</p>'}
-      ${memberForm(randomMember(), 'Los geht\'s')}`,
+    title: switching ? 'Profil wechseln' : 'Willkommen im Haus! 👋',
+    html: `<div class="who-step">
+        <div class="label" style="margin:0 4px 8px">Du bist schon dabei? Wähle dein Profil:</div>
+        <div id="who-pick">${pickHtml()}</div>
+      </div>
+      <div class="divider">oder</div>
+      <button type="button" class="btn block" id="who-new-btn">${I.plus}Neues Profil erstellen</button>
+      <div id="who-new" hidden>
+        <div class="label" style="margin:0 4px 8px">Wie sollen dich die anderen sehen?</div>
+        ${memberForm(randomMember(), 'Profil erstellen')}
+      </div>`,
+    refresh: (api) => {
+      $('#who-pick', api.el).innerHTML = pickHtml();
+      // Erst-Person: Formular direkt zeigen
+      if (synced() && !state.members.length) { $('#who-new', api.el).hidden = false; $('#who-new-btn', api.el).hidden = true; }
+    },
     onMount: (api) => {
       api.body.addEventListener('click', (e) => {
         const b = e.target.closest('[data-pick]');
-        if (b) { state.me = b.dataset.pick; LS.set('me', state.me); api.close(); render(); beat(true); syncPushSub().catch(() => {}); toast(`👋 Hallo ${member(state.me)?.name}!`); }
+        if (b) {
+          state.me = b.dataset.pick; LS.set('me', state.me); api.close(); render(); beat(true);
+          syncPushSub().catch(() => {});
+          toast(`👋 Hallo ${member(state.me)?.name}!`);
+          return;
+        }
+        if (e.target.closest('#who-new-btn')) {
+          $('#who-new', api.el).hidden = false;
+          $('#who-new-btn', api.el).hidden = true;
+          setTimeout(() => $('#m-name', api.el)?.focus(), 50);
+        }
       });
+      if (synced() && !state.members.length) { $('#who-new', api.el).hidden = false; $('#who-new-btn', api.el).hidden = true; }
       const v = randomMember();
       bindMemberForm(api.el, v, (val) => {
         const id = addDoc('members', { name: val.name, emoji: val.emoji, color: val.color, photo: val.photo || null, createdAt: Date.now() });
@@ -2721,9 +2753,10 @@ async function connect(hid, { create } = {}) {
   state.me = LS.get('me');
 
   for (const col of COLLECTIONS) {
-    store.subscribe(col, (list) => {
+    store.subscribe(col, (list, meta) => {
       state[col] = list;
       state.loaded.add(col);
+      if (!meta?.fromCache) state.synced.add(col);
       if (col === 'trash') removeExampleBins();
       if (col === 'members' && state.ready && (!state.me || !member(state.me)) && !sheets.some((s) => s.el.querySelector('#mf'))) whoAreYou();
       render();
@@ -2737,7 +2770,9 @@ async function connect(hid, { create } = {}) {
     if (state.ready && presenceChanged()) render();
   });
   // Warten bis Mitglieder geladen sind
-  await new Promise((res) => { const t = setInterval(() => { if (state.loaded.has('members')) { clearInterval(t); res(); } }, 30); setTimeout(() => { clearInterval(t); res(); }, 6000); });
+  // (auf einem neuen Gerät ist der Zwischenspeicher leer – deshalb auf die Server-Antwort warten)
+  await new Promise((res) => { const t = setInterval(() => { if (state.synced.has('members') || (state.loaded.has('members') && state.members.length)) { clearInterval(t); res(); } }, 30); setTimeout(() => { clearInterval(t); res(); }, 6000); });
+  setTimeout(() => { state.synced.add('members'); render(); }, 8000); // offline: nicht ewig „wird geladen“ zeigen
 
   state.ready = true;
   $('#dock').hidden = false;
