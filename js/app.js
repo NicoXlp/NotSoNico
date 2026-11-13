@@ -423,7 +423,40 @@ function settleViewport() {
     requestAnimationFrame(() => { st.minHeight = ''; window.scrollTo(0, y); });
   }, 80);
 }
-document.addEventListener('focusout', () => settleViewport());
+/* iPhone/iPad als Home-Bildschirm-App: Safari lässt den Bereich der App nach der Tastatur oft
+   um die Höhe der Eingabeleiste verkleinert – Navigationsleiste und Fenster sitzen dann zu hoch,
+   bis man zieht. Wir messen die Lücke und gleichen sie sofort aus (--ios-gap). */
+const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const iosApp = () => navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+let iosBase = null, iosOrient = null;
+function fullHeight() {
+  const a = screen.width, b = screen.height;
+  return matchMedia('(orientation: portrait)').matches ? Math.max(a, b) : Math.min(a, b);
+}
+function fixIosGap() {
+  if (!IS_IOS || !iosApp()) return;
+  const orient = matchMedia('(orientation: portrait)').matches ? 'p' : 'l';
+  const gap = Math.round(fullHeight() - window.innerHeight);
+  // Grundwert merken, solange nicht getippt wird (manche Geräte haben von Haus aus eine kleine Differenz)
+  if (iosBase === null || iosOrient !== orient) { if (!typing()) { iosBase = gap; iosOrient = orient; } else return; }
+  if (!typing() && gap < iosBase) iosBase = gap;
+  const extra = typing() ? 0 : Math.max(0, gap - iosBase);
+  document.documentElement.style.setProperty('--ios-gap', extra > 2 && extra < 160 ? `${extra}px` : '0px');
+}
+function nudgeViewport() {
+  // Viewport-Angabe kurz neu setzen: zwingt Safari, die Höhe neu zu berechnen
+  const vp = document.querySelector('meta[name=viewport]');
+  if (!vp || !IS_IOS) return;
+  const c = vp.getAttribute('content');
+  vp.setAttribute('content', c + ', maximum-scale=1');
+  requestAnimationFrame(() => { vp.setAttribute('content', c); fixIosGap(); });
+}
+window.addEventListener('resize', fixIosGap);
+window.visualViewport?.addEventListener('resize', () => setTimeout(fixIosGap, 50));
+window.addEventListener('orientationchange', () => { iosBase = null; setTimeout(fixIosGap, 400); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(fixIosGap, 300); });
+fixIosGap();
+document.addEventListener('focusout', () => { settleViewport(); setTimeout(() => { if (!typing()) { nudgeViewport(); fixIosGap(); } }, 120); setTimeout(fixIosGap, 500); });
 window.visualViewport?.addEventListener('resize', () => { if (!typing()) settleViewport(); });
 // Während ein Fenster offen ist, darf die Seite dahinter nicht wegrutschen (iOS verschiebt sie beim Tippen)
 window.addEventListener('scroll', () => { if (scrollLocked && !typing() && Math.abs(window.scrollY - lockY) > 1) settleViewport(); }, { passive: true });
@@ -456,6 +489,7 @@ function openSheet({ title, html, onMount, refresh, onClose }) {
     wrap.classList.add('closing');
     setTimeout(() => wrap.remove(), 380);
     sheets.splice(sheets.indexOf(api), 1);
+    setTimeout(fixIosGap, 50);
     if (!sheets.length) setTimeout(() => { if (!sheets.length) unlockScroll(); }, 0);
   }
   wrap.addEventListener('click', (e) => {
