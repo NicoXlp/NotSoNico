@@ -2231,7 +2231,7 @@ function applyTheme() {
   else document.documentElement.dataset.theme = t;
 }
 
-const LOGO = `<div class="logo"><img src="icons/icon.svg?v=2" alt=""></div>`;
+const LOGO = `<div class="logo"><img src="icons/icon.svg?v=3" alt=""></div>`;
 
 function showWelcome() {
   $('#dock').hidden = true;
