@@ -1420,6 +1420,7 @@ const NEWS = [
   {
     id: '2026-11-13-dm',
     date: '2026-11-13',
+    label: '✨ Neue Funktionen',
     items: [
       { icon: '💬', title: 'Privatnachrichten', text: 'Schreibt euch privat – mit Text oder Sprachnachricht. Nur ihr beide seht den Chat.', act: 'dms', btn: 'Nachrichten öffnen' },
       { icon: '📋', title: 'Aufgaben zuteilen', text: 'Im Chat mit ☑️ eine Aufgabe für dein Gegenüber anlegen – sie kann direkt dort abgehakt werden.' },
@@ -1431,7 +1432,7 @@ const NEWS = [
 function newsCard() {
   if (!NEWS.length) return '';
   const entry = (n, i) => `<div class="news-entry">
-      <div class="news-meta"><span class="news-badge ${i ? 'old' : ''}">${esc(n.label || '✨ Neu')}</span><span class="small muted">${esc(fmt(n.date, { day: 'numeric', month: 'long' }))}</span></div>
+      <div class="news-meta"><span class="news-badge ${i ? 'old' : ''}">${esc(n.label || '✨ Neue Funktionen')}</span><span class="small muted">${esc(fmt(n.date, { day: 'numeric', month: 'long' }))}</span></div>
       <div class="news-list">${n.items.map((it) => `<div class="news-item"><span class="news-ico">${it.icon}</span>
         <div class="main"><div class="title">${esc(it.title)}</div><div class="small muted">${esc(it.text)}</div>
         ${it.act ? `<button class="link news-btn" data-act="${it.act}" ${it.v ? `data-v="${it.v}"` : ''}>${esc(it.btn)} ›</button>` : ''}</div></div>`).join('')}</div>
