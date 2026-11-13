@@ -1596,3 +1596,10 @@ html, body { min-height: 100%; }
 /* Ausgleich, falls iOS den App-Bereich nach der Tastatur verkleinert lässt (siehe fixIosGap) */
 .dock { bottom: calc(max(14px, calc(var(--safe-b) + 4px)) - var(--ios-gap, 0px)); transition: bottom .25s ease; }
 .sheet-wrap { bottom: calc(0px - var(--ios-gap, 0px)); }
+
+/* Anzeige-Diagnose */
+#vpdiag {
+  position: fixed; z-index: 9999; left: 6px; top: calc(var(--safe-t) + 4px); pointer-events: none;
+  white-space: pre; font: 600 10px/1.35 ui-monospace, Menlo, monospace; color: #fff;
+  background: rgba(0, 0, 0, .72); padding: 5px 7px; border-radius: 8px; max-width: calc(100vw - 12px); overflow: hidden;
+}

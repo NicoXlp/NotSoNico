@@ -433,8 +433,18 @@ let kbBaseH = null;      // Höhe vor dem Öffnen der Tastatur
 let kbArmed = false;     // Tastatur war offen → auf zurückbleibende Lücke achten
 let kbDisarm = 0, kbClosedAt = 0;
 function setGap(px) { document.documentElement.style.setProperty('--ios-gap', px > 2 && px < 200 ? `${Math.round(px)}px` : '0px'); }
+/** Wie weit ragt der sichtbare Bereich unten über den Layout-Bereich hinaus?
+ *  (iOS lässt die Ansicht nach der Tastatur manchmal verschoben – dann sitzt alles Feste zu hoch.) */
+function vvOverflow() {
+  const vv = window.visualViewport;
+  if (!vv) return 0;
+  return Math.round(vv.offsetTop + vv.height - window.innerHeight);
+}
 function fixIosGap() {
-  if (typing() || !kbArmed || kbBaseH == null) { if (!typing()) setGap(0); return; }
+  if (typing()) return;
+  const vvGap = vvOverflow();
+  if (vvGap > 2) { setGap(vvGap); return; }
+  if (!kbArmed || kbBaseH == null) { setGap(0); return; }
   const gap = kbBaseH - window.innerHeight;
   clearTimeout(kbDisarm);
   if (gap <= 2) {
@@ -461,6 +471,7 @@ document.addEventListener('focusin', (e) => {
 });
 window.addEventListener('resize', fixIosGap);
 window.visualViewport?.addEventListener('resize', () => setTimeout(fixIosGap, 50));
+window.visualViewport?.addEventListener('scroll', () => setTimeout(fixIosGap, 30));
 let lastAngle = screen.orientation?.angle ?? window.orientation ?? 0;
 window.addEventListener('orientationchange', () => {
   // Nur echtes Drehen des Geräts zählt (nicht das Verkleinern durch die Tastatur)
@@ -474,9 +485,35 @@ document.addEventListener('focusout', (e) => {
   if (!isTextField(e.target) || kbBaseH == null) return;
   kbArmed = true; kbClosedAt = Date.now();
   setTimeout(() => { if (!typing()) { nudgeViewport(); fixIosGap(); } }, 120);
-  setTimeout(fixIosGap, 500);
-  setTimeout(fixIosGap, 1200);
+  [300, 500, 800, 1200, 2000, 3000].forEach((t) => setTimeout(fixIosGap, t));
 });
+
+/* ─── Anzeige-Diagnose (Haus → Daten): zeigt live, was das Gerät über den Bildschirm meldet ─── */
+let diagTimer = 0;
+function toggleViewportDiag(on = !LS.get('vpdiag', false)) {
+  LS.set('vpdiag', on);
+  document.getElementById('vpdiag')?.remove();
+  clearInterval(diagTimer);
+  if (!on) return;
+  const box = document.createElement('div');
+  box.id = 'vpdiag';
+  document.body.appendChild(box);
+  const upd = () => {
+    const vv = window.visualViewport;
+    const dock = document.querySelector('.dock')?.getBoundingClientRect();
+    const sw = document.querySelector('.sheet-wrap.open .sheet')?.getBoundingClientRect();
+    box.textContent = [
+      `iH ${innerHeight}  cH ${document.documentElement.clientHeight}  scr ${screen.width}×${screen.height}`,
+      `vv ${vv ? `${Math.round(vv.width)}×${Math.round(vv.height)} top ${Math.round(vv.offsetTop)} scale ${vv.scale.toFixed(2)}` : '–'}`,
+      `scrollY ${Math.round(scrollY)}  gap ${getComputedStyle(document.documentElement).getPropertyValue('--ios-gap').trim() || '0'}  over ${vvOverflow()}`,
+      `kb ${kbArmed ? 'an' : 'aus'} base ${kbBaseH ?? '–'}  tippt ${typing() ? 'ja' : 'nein'}  app ${navigator.standalone === true || matchMedia('(display-mode: standalone)').matches ? 'ja' : 'nein'}`,
+      `Leiste unten ${dock ? Math.round(innerHeight - dock.bottom) : '–'}  Fenster unten ${sw ? Math.round(innerHeight - sw.bottom) : '–'}`,
+    ].join('\n');
+  };
+  upd();
+  diagTimer = setInterval(upd, 250);
+}
+if (LS.get('vpdiag', false)) setTimeout(() => toggleViewportDiag(true), 500);
 window.visualViewport?.addEventListener('resize', () => { if (!typing()) settleViewport(); });
 // Während ein Fenster offen ist, darf die Seite dahinter nicht wegrutschen (iOS verschiebt sie beim Tippen)
 window.addEventListener('scroll', () => { if (scrollLocked && !typing() && Math.abs(window.scrollY - lockY) > 1) settleViewport(); }, { passive: true });
@@ -1830,6 +1867,7 @@ const VIEWS = {
         <button data-act="cloud">${I.cloud}<span>Synchronisierung<span class="desc">${esc(mode)}</span></span></button>
         <button data-act="house-rename">${I.pen}<span>Haus umbenennen</span></button>
         <button data-act="export">${I.download}<span>Backup herunterladen<span class="desc">Alle Daten als JSON-Datei</span></span></button>
+        <button data-act="vpdiag">${I.cal}<span>Anzeige-Diagnose<span class="desc">${LS.get('vpdiag', false) ? 'An – Messwerte oben links' : 'Aus – nur zur Fehlersuche'}</span></span></button>
         <button data-act="import">${I.upload}<span>Backup wiederherstellen</span></button>
         <button data-act="switch-user">${I.user}<span>Profil wechseln<span class="desc">Angemeldet als ${esc(me()?.name || '–')}</span></span></button>
         <button class="danger" data-act="leave">${I.door}<span>Haus auf diesem Gerät verlassen</span></button>
@@ -3625,6 +3663,7 @@ const ACTIONS = {
   profile: () => memberSheet(state.me),
   add: () => onFab(),
   dms: () => dmListSheet(),
+  vpdiag: () => { toggleViewportDiag(); renderNow(false); toast(LS.get('vpdiag', false) ? '🔧 Diagnose an – oben links erscheinen Messwerte' : 'Diagnose aus'); },
   'dm-open': (d) => chatSheet(d.id),
   'goto-tasks': (d) => { state.taskView = 'open'; state.taskPerson = d.v; switchTab('tasks'); },
   'goto-person': (d) => { state.taskView = 'open'; state.taskPerson = d.id === state.me ? 'mine' : d.id; switchTab('tasks'); },
