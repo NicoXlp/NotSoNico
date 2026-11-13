@@ -1835,9 +1835,11 @@ function composeSheet(type = 'post', existing = null, preset = {}) {
       </div>
       <div data-k="post" ${kind === 'post' ? '' : 'hidden'}>
         <div class="field mention-field"><label for="c-text">Beitrag</label><textarea id="c-text" maxlength="4000" placeholder="Was gibt's Neues? 😊 Mit @ markierst du jemanden" style="min-height:${attachments.length || pickPhotos ? 90 : 140}px">${esc(p?.text || '')}</textarea></div>
-        <button type="button" class="btn sm attach-btn" id="c-at" style="margin:-4px 0 10px">@ Person markieren</button>
+        <div class="attach-row">
+          <button type="button" class="btn sm attach-btn" id="c-at">@ Person markieren</button>
+          <label class="btn sm attach-btn">${I.photo}Fotos / Videos<input type="file" id="c-files" accept="image/*,video/*" multiple hidden></label>
+        </div>
         <div class="attach" id="att"></div>
-        <label class="btn sm attach-btn">${I.photo}Fotos / Videos hinzufügen<input type="file" id="c-files" accept="image/*,video/*" multiple hidden></label>
         <p class="small muted" style="margin:6px 4px 12px">Bis zu ${MAX_ITEMS} Stück · Videos bis 20 MB (am besten kurze Clips)</p>
       </div>
       <div data-k="poll" ${kind === 'poll' ? '' : 'hidden'}>
