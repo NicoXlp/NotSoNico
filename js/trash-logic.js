@@ -50,7 +50,26 @@ export function nowIn(timeZone = 'Europe/Berlin', now = new Date()) {
   return { date: `${parts.year}-${parts.month}-${parts.day}`, hour: +parts.hour };
 }
 
-export const DEFAULT_PREFS = { enabled: true, dayBefore: true, hour: 18, mode: 'all', followUp: true, followHour: 21 };
+export const DEFAULT_PREFS = { enabled: true, trash: true, dayBefore: true, hour: 18, mode: 'all', followUp: true, followHour: 21, events: {} };
+
+/** Arten von Neuigkeits-Mitteilungen (einzeln abschaltbar) */
+export const EVENT_TYPES = [
+  ['task_new', '📝 Neue Aufgaben'],
+  ['task_done', '✅ Erledigte Aufgaben'],
+  ['post_new', '📌 Neue Beiträge auf der Pinnwand'],
+  ['social', '❤️ Likes, Kommentare & Reaktionen auf meine Beiträge'],
+  ['bin_done', '🗑️ Tonne wurde rausgestellt'],
+];
+
+/** Welche Neuigkeiten gehen an dieses Mitglied? (nicht an die auslösende Person, nur an Empfänger, abgeschaltete Arten weg) */
+export function eventsFor(events, memberId, prefs, now = Date.now()) {
+  const pr = { ...DEFAULT_PREFS, ...prefs };
+  if (!pr.enabled) return [];
+  return events.filter((e) => now - (e.at || 0) < 6 * 3600e3
+    && e.actor !== memberId
+    && (!e.to || e.to.includes(memberId))
+    && (pr.events?.[e.pref] !== false));
+}
 
 /**
  * Welche Erinnerungen sind JETZT für ein Mitglied fällig?
@@ -59,7 +78,7 @@ export const DEFAULT_PREFS = { enabled: true, dayBefore: true, hour: 18, mode: '
  */
 export function dueReminders({ bins, memberId, memberIds, prefs, date, hour, sent = [] }) {
   const pr = { ...DEFAULT_PREFS, ...prefs };
-  if (!pr.enabled) return [];
+  if (!pr.enabled || pr.trash === false) return [];
   const out = [];
   const target = pr.dayBefore ? addDays(date, 1) : date;
   const slots = [['main', pr.hour]];

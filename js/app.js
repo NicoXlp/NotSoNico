@@ -4,7 +4,7 @@ import { FIREBASE_CONFIG, VAPID_PUBLIC_KEY } from './config.js';
 import { prepareFile, uploadMedia, loadMediaURL, cachedURL, removeMedia, MAX_ITEMS } from './media.js';
 import {
   pad, iso, parseISO, addDays, daysBetween, binDates, binWho as binWhoRaw, doneInfo, binAppliesTo,
-  dueReminders, reminderText, DEFAULT_PREFS,
+  dueReminders, reminderText, DEFAULT_PREFS, EVENT_TYPES,
 } from './trash-logic.js';
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -233,6 +233,17 @@ function presenceChanged() {
   return true;
 }
 const nameOf = (id) => (id === state.me ? 'Du' : member(id)?.name || 'Jemand');
+
+/** Neuigkeit für die Push-Mitteilungen hinterlegen (verschickt der Server alle 5 Min.).
+ *  to: Empfänger-IDs oder null = alle außer mir; pref: Art (abschaltbar) */
+function emit(pref, { title, body, to = null, tab = 'home', tag } = {}) {
+  if (store?.mode !== 'cloud' || !state.me) return;
+  const id = newId();
+  store.add('events', { id, pref, actor: state.me, at: Date.now(), to, title, body: String(body || '').slice(0, 180), tab, tag: tag || `${pref}-${id}` })
+    .catch((e) => console.warn('Neuigkeit nicht gespeichert', e));
+}
+const myName = () => me()?.name || 'Jemand';
+const snippet = (t, n = 80) => { const s = String(t || '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 
 /* Optimistische Änderung: sofort lokal anzeigen, dann speichern */
 function mutate(col, id, fn) {
@@ -639,9 +650,13 @@ function toggleTask(id) {
       return { ...cur, due, assignee, history, lastDoneBy: state.me, lastDoneAt: Date.now() };
     });
     toast(`✓ Erledigt – nächstes Mal ${fmtDay(nd)}`);
+    emit('task_done', { title: `✅ ${myName()} hat eine Aufgabe erledigt`, body: t.title, tab: 'tasks' });
   } else {
     mutate('tasks', id, (cur) => ({ ...cur, done: !cur.done, doneBy: cur.done ? null : state.me, doneAt: cur.done ? null : Date.now() }));
-    if (!t.done) toast('✓ Erledigt – super!');
+    if (!t.done) {
+      toast('✓ Erledigt – super!');
+      emit('task_done', { title: `✅ ${myName()} hat eine Aufgabe erledigt`, body: t.title, tab: 'tasks' });
+    }
   }
 }
 
@@ -709,7 +724,10 @@ async function toggleBinDone(id, date) {
   const d = bin && doneInfo(bin, date);
   if (d && d.by !== state.me && !(await confirmSheet(`${nameOf(d.by)} hat das bestätigt. Bestätigung wirklich zurücknehmen?`, 'Zurücknehmen'))) return;
   haptic(d ? 8 : 18);
-  if (!d) toast(`✓ ${bin?.name || 'Tonne'} ist draußen – danke! 🙌`);
+  if (!d) {
+    toast(`✓ ${bin?.name || 'Tonne'} ist draußen – danke! 🙌`);
+    if (bin) emit('bin_done', { title: `🗑️ ${bin.name} ist draußen`, body: `${myName()} hat die Tonne rausgestellt ✓`, to: (bin.members || []).length ? bin.members : null, tab: 'trash', tag: `bin-${bin.id}-${date}` });
+  }
   mutate('trash', id, (b) => {
     const done = { ...(b.done || {}) };
     if (done[date]) delete done[date]; else done[date] = { by: state.me, at: Date.now() };
@@ -726,8 +744,18 @@ const upcomingEvents = () => state.feed.filter((p) => p.type === 'event' && p.ev
   .sort((a, b) => (a.event.date + (a.event.time || '')).localeCompare(b.event.date + (b.event.time || '')));
 const openPollsForMe = () => state.feed.filter((p) => p.type === 'poll' && !p.poll?.closed && !(p.poll?.options || []).some((o) => (o.votes || []).includes(state.me)));
 
+function postLabel(p) {
+  if (p.type === 'poll') return `deine Umfrage „${snippet(p.poll?.question, 50)}“`;
+  if (p.type === 'event') return `dein Ereignis „${snippet(p.event?.title, 50)}“`;
+  if (p.type === 'voice') return 'deine Sprachnachricht';
+  return p.text ? `deinen Beitrag „${snippet(p.text, 50)}“` : 'deinen Beitrag';
+}
 function toggleLike(id) {
   haptic(10);
+  const post = state.feed.find((x) => x.id === id);
+  if (post && post.author !== state.me && !(post.likes || []).includes(state.me)) {
+    emit('social', { title: `❤️ ${myName()} gefällt das`, body: `${myName()} gefällt ${postLabel(post)}`, to: [post.author], tab: 'board', tag: `like-${id}` });
+  }
   mutate('feed', id, (p) => {
     const s = new Set(p.likes || []);
     s.has(state.me) ? s.delete(state.me) : s.add(state.me);
@@ -736,6 +764,10 @@ function toggleLike(id) {
 }
 function react(id, emoji) {
   haptic(10);
+  const post = state.feed.find((x) => x.id === id);
+  if (post && post.author !== state.me && !(post.reactions?.[emoji] || []).includes(state.me)) {
+    emit('social', { title: `${emoji} ${myName()} hat reagiert`, body: `${myName()} hat mit ${emoji} auf ${postLabel(post)} reagiert`, to: [post.author], tab: 'board', tag: `react-${id}` });
+  }
   mutate('feed', id, (p) => {
     const r = { ...(p.reactions || {}) };
     const s = new Set(r[emoji] || []);
@@ -1370,6 +1402,7 @@ const VIEWS = {
 
       <h2 class="section-title">Daten</h2>
       <div class="menu-list">
+        <button data-act="notify">${I.bell}<span>Mitteilungen<span class="desc">${notifyPrefs().enabled ? 'An – Aufgaben, Pinnwand, Müll' : 'Aus'}</span></span></button>
         <button data-act="cloud">${I.cloud}<span>Synchronisierung<span class="desc">${esc(mode)}</span></span></button>
         <button data-act="house-rename">${I.pen}<span>Haus umbenennen</span></button>
         <button data-act="export">${I.download}<span>Backup herunterladen<span class="desc">Alle Daten als JSON-Datei</span></span></button>
@@ -1428,7 +1461,11 @@ function taskSheet(id) {
         if (!data.title) return;
         if (data.repeat !== 'none' && !data.due) data.due = today();
         if (t) mutate('tasks', t.id, (cur) => ({ ...cur, ...data }));
-        else addDoc('tasks', { ...data, done: false, createdBy: state.me, createdAt: Date.now() });
+        else {
+          addDoc('tasks', { ...data, done: false, createdBy: state.me, createdAt: Date.now() });
+          const forWho = data.assignee ? (data.assignee === state.me ? ` (für ${myName()})` : ` · für ${member(data.assignee)?.name || '?'}`) : ' · für alle';
+          emit('task_new', { title: `📝 Neue Aufgabe von ${myName()}`, body: `${data.title}${forWho}${data.due ? ` · fällig ${fmtDay(data.due)}` : ''}`, tab: 'tasks' });
+        }
         haptic(10);
         toast(t ? 'Gespeichert' : '✓ Aufgabe angelegt');
         api.close();
@@ -1804,7 +1841,16 @@ function composeSheet(type = 'post', existing = null) {
           if (!title || !date) return toast('Titel und Datum fehlen noch');
           base.event = { title, date, time: $('#c-es', f).value, endTime: $('#c-ee', f).value, location: $('#c-el', f).value.trim(), desc: $('#c-edesc', f).value.trim(), rsvp: p?.event?.rsvp || { [state.me]: 'yes' } };
         }
-        if (p) setDoc('feed', base); else addDoc('feed', base);
+        if (p) setDoc('feed', base);
+        else {
+          addDoc('feed', base);
+          const n = myName();
+          const msg = kind === 'poll' ? { title: `📊 Neue Umfrage von ${n}`, body: base.poll.question }
+            : kind === 'event' ? { title: `📅 ${n} hat ein Ereignis geplant`, body: `${base.event.title} · ${fmtDay(base.event.date)}${base.event.time ? `, ${base.event.time} Uhr` : ''}` }
+            : kind === 'voice' ? { title: `🎤 Sprachnachricht von ${n}`, body: base.text || `${fmtDur(base.voice.duration)} anhören` }
+            : { title: `📌 Neuer Beitrag von ${n}`, body: base.text || (base.media?.length ? `${base.media.length === 1 ? (base.media[0].kind === 'video' ? 'Ein Video' : 'Ein Foto') : `${base.media.length} Fotos/Videos`} 📷` : '') };
+          emit('post_new', { ...msg, body: snippet(msg.body), tab: 'board' });
+        }
         haptic(12);
         toast(p ? 'Gespeichert' : '✓ Veröffentlicht');
         api.close();
@@ -1859,6 +1905,10 @@ function commentsSheet(id) {
         ta.value = ''; ta.style.height = '';
         haptic(8);
         mutate('feed', id, (p) => ({ ...p, comments: [...(p.comments || []), { id: newId(), author: state.me, text, at: Date.now() }] }));
+        const post = state.feed.find((x) => x.id === id);
+        if (post && post.author !== state.me) {
+          emit('social', { title: `💬 ${myName()} hat kommentiert`, body: snippet(text, 120), to: [post.author], tab: 'board', tag: `comment-${id}` });
+        }
         setTimeout(() => { api.body.scrollTop = api.body.scrollHeight; }, 80);
       };
       $('#clist', api.el).addEventListener('click', async (e) => {
@@ -1934,7 +1984,7 @@ function notifyCard() {
   const on = pr.enabled && hasNotif() && Notification.permission === 'granted';
   return `<button class="card notify-card" data-act="notify">
     <span class="bell ${on ? 'on' : ''}">${I.bell}</span>
-    <span class="main"><b>${on ? 'Erinnerungen sind an' : 'Erinnerungen einschalten'}</b>
+    <span class="main"><b>${on ? (pr.trash === false ? 'Müll-Erinnerungen sind aus' : 'Erinnerungen sind an') : 'Erinnerungen einschalten'}</b>
       <span class="small muted">${on
         ? `${pr.dayBefore ? 'Am Vorabend' : 'Am Abholtag'} um ${pr.hour} Uhr${pr.mode === 'mine' ? ' · nur wenn du dran bist' : ''}${pr.followUp ? ` · Nachfassen um ${pr.followHour} Uhr` : ''}`
         : 'Push-Mitteilung, wann welche Tonne raus muss'}</span></span>
@@ -1957,10 +2007,15 @@ function notifySheet() {
   const hours = (sel, from, to) => Array.from({ length: to - from + 1 }, (_, i) => from + i)
     .map((h) => `<option value="${h}" ${h === sel ? 'selected' : ''}>${pad(h)}:00 Uhr</option>`).join('');
   openSheet({
-    title: 'Müll-Erinnerungen',
+    title: 'Mitteilungen',
     html: `${pushStatus()}
       <form id="nf">
-        ${toggle('n-on', '🔔 Erinnerungen auf diesem Gerät', pr.enabled || !LS.get('notify'))}
+        ${toggle('n-on', '🔔 Mitteilungen auf diesem Gerät', pr.enabled || !LS.get('notify'))}
+        <div class="label" style="margin:16px 4px 8px">Neuigkeiten aus dem Haus</div>
+        ${EVENT_TYPES.map(([k, l]) => toggle(`n-ev-${k}`, l, pr.events?.[k] !== false)).join('')}
+        <p class="small muted" style="margin:0 4px 6px">Kommen nach etwa 5–15 Minuten an. Für eigene Aktionen bekommst du keine Mitteilung.</p>
+        <div class="label" style="margin:18px 4px 8px">Müll-Erinnerungen</div>
+        ${toggle('n-trash', '🗑️ An die Tonnen erinnern', pr.trash !== false)}
         <div class="field"><span class="label">Wann erinnern?</span><div id="n-when">${segmented([['1', 'Am Vorabend'], ['0', 'Am Abholtag']], pr.dayBefore ? '1' : '0', 'noop')}</div></div>
         <div class="field"><label for="n-hour">Uhrzeit</label><select id="n-hour">${hours(pr.hour, 5, 22)}</select></div>
         <div class="field"><span class="label">Wofür?</span><div id="n-mode">${segmented([['all', 'Alle meine Tonnen'], ['mine', 'Nur wenn ich dran bin']], pr.mode, 'noop')}</div>
@@ -1996,6 +2051,8 @@ function notifySheet() {
         e.preventDefault();
         const prefs = {
           enabled: $('#n-on', f).checked,
+          trash: $('#n-trash', f).checked,
+          events: Object.fromEntries(EVENT_TYPES.map(([k]) => [k, $(`#n-ev-${k}`, f).checked])),
           dayBefore: val.when === '1',
           hour: +$('#n-hour', f).value,
           mode: val.mode,
@@ -2017,7 +2074,7 @@ async function savePushPrefs(prefs) {
   LS.set('notify', prefs);
   if (!prefs.enabled) {
     await unsubscribePush();
-    toast('🔕 Erinnerungen aus');
+    toast('🔕 Mitteilungen aus');
     return true;
   }
   if (!hasNotif()) { toast(isIOS() ? 'Bitte erst zum Home-Bildschirm hinzufügen 📱' : 'Mitteilungen werden hier nicht unterstützt', 4000); return false; }
@@ -2025,7 +2082,7 @@ async function savePushPrefs(prefs) {
   if (perm !== 'granted') { toast('🔕 Ohne Erlaubnis kann ich dich leider nicht erinnern', 4000); return false; }
   try {
     const active = await syncPushSub(true);
-    toast(active ? '🔔 Push-Erinnerungen aktiv!' : '🔔 Erinnerungen aktiv (solange die App offen ist)', 3500);
+    toast(active ? '🔔 Push-Mitteilungen aktiv!' : '🔔 Erinnerungen aktiv (solange die App offen ist)', 3500);
   } catch (e) {
     console.error(e);
     toast('⚠️ Push konnte nicht aktiviert werden – Erinnerung nur bei offener App', 4500);
@@ -2690,7 +2747,7 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   // Klick auf „✓ Rausgestellt“ in einer Mitteilung, während die App schon offen ist
   navigator.serviceWorker.addEventListener('message', (e) => {
     if (e.data?.type === 'bin-done' && state.ready) confirmFromNotification(e.data.bin, e.data.date);
-    if (e.data?.type === 'open-tab' && state.ready) switchTab(e.data.tab);
+    if (e.data?.type === 'open-tab' && state.ready && TABS.some((t) => t.id === e.data.tab)) switchTab(e.data.tab);
   });
 }
 setInterval(checkLocalReminders, 60000);
