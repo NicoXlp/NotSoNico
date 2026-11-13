@@ -81,7 +81,8 @@ class CloudStore {
   _c(c) { return this.fs.collection(this.db, 'households', this.hid, c); }
   _d(c, id) { return this.fs.doc(this.db, 'households', this.hid, c, id); }
   subscribe(c, f) {
-    return this.fs.onSnapshot(this._c(c), (snap) => f(snap.docs.map((d) => ({ ...d.data(), id: d.id }))),
+    return this.fs.onSnapshot(this._c(c), { includeMetadataChanges: true },
+      (snap) => f(snap.docs.map((d) => ({ ...d.data(), id: d.id })), { fromCache: snap.metadata.fromCache }),
       (err) => console.error('Snapshot-Fehler', c, err));
   }
   async get(c, id) { const s = await this.fs.getDoc(this._d(c, id)); return s.exists() ? { ...s.data(), id } : null; }

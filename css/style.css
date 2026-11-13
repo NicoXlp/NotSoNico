@@ -1018,3 +1018,7 @@ img.blur { filter: blur(14px) saturate(1.2); transform: scale(1.08); }
 .cal-day { cursor: pointer; transition: background .2s, transform .25s var(--spring); }
 .cal-day:active { background: var(--fill); transform: scale(.92); }
 .cal-day.today:active { background: var(--accent); }
+
+/* Profilauswahl beim Beitreten */
+.profile-pick button.on { outline: 2px solid var(--accent); }
+.profile-pick button .small { font-weight: 500; }
