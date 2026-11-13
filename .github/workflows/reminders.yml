@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '7 * * * *'   # stündlich (GitHub startet geplante Läufe manchmal ein paar Minuten später)
   workflow_dispatch:
+    inputs:
+      test:
+        description: 'Test-Mitteilung an alle Geräte mit eingeschalteten Erinnerungen schicken'
+        type: boolean
+        default: false
 
 jobs:
   send:
@@ -13,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
       - run: npm install --omit=dev --no-audit --no-fund
       - run: node scripts/send-reminders.mjs
         env:
@@ -24,3 +29,4 @@ jobs:
           VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+          PUSH_TEST: ${{ inputs.test && '1' || '' }}

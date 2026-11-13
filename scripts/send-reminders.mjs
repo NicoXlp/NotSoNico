@@ -13,6 +13,8 @@ import { dueReminders, reminderText, nowIn } from '../js/trash-logic.js';
 
 const { FIREBASE_SERVICE_ACCOUNT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY } = process.env;
 const DRY = process.argv.includes('--dry-run');
+// Test-Modus: an jedes Gerät mit eingeschalteten Erinnerungen eine Test-Mitteilung schicken
+const TEST = process.env.PUSH_TEST === '1' || process.argv.includes('--test');
 if (!FIREBASE_SERVICE_ACCOUNT || !VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
   console.log('Push ist nicht eingerichtet (Secrets fehlen) – nichts zu tun.');
   process.exit(0);
@@ -24,6 +26,7 @@ webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'https://nicoxlp.github.io/
 
 const load = (ref, col) => ref.collection(col).get().then((s) => s.docs.map((d) => ({ ...d.data(), id: d.id })));
 let sentTotal = 0;
+let subsTotal = 0;
 
 for (const house of await db.collection('households').listDocuments()) {
   const subs = await load(house, 'subs');
@@ -34,6 +37,22 @@ for (const house of await db.collection('households').listDocuments()) {
 
   for (const sub of subs) {
     if (!sub.subscription || !memberIds.includes(sub.memberId)) continue;
+    subsTotal++;
+    if (TEST) {
+      try {
+        await webpush.sendNotification(sub.subscription, JSON.stringify({
+          title: '🔔 Test: Push funktioniert!',
+          body: `Hallo ${nameOf(sub.memberId)}, ab jetzt erinnert dich das Vermietertagebuch an die Müllabfuhr.`,
+          tag: 'push-test', url: './?tab=trash',
+        }), { TTL: 3600 });
+        sentTotal++;
+        console.log('Test gesendet an', nameOf(sub.memberId), '·', (sub.device || '').slice(0, 60));
+      } catch (e) {
+        if (e.statusCode === 404 || e.statusCode === 410) { await house.collection('subs').doc(sub.id).delete(); console.log('Abgelaufenes Abo entfernt'); }
+        else console.error('Test fehlgeschlagen', e.statusCode, e.body);
+      }
+      continue;
+    }
     const { date, hour } = nowIn(sub.tz || 'Europe/Berlin');
     const due = dueReminders({ bins, memberId: sub.memberId, memberIds, prefs: sub.prefs, date, hour, sent: sub.sent || [] });
     if (!due.length) continue;
@@ -58,4 +77,4 @@ for (const house of await db.collection('households').listDocuments()) {
     if (sentKeys.length && !DRY) await ref.update({ sent: [...sentKeys, ...(sub.sent || [])].slice(0, 60), lastPushAt: Date.now() });
   }
 }
-console.log(`Fertig – ${sentTotal} Erinnerung(en) verschickt.`);
+console.log(`Fertig – ${subsTotal} Gerät(e) mit Erinnerungen, ${sentTotal} ${TEST ? 'Test-Mitteilung(en)' : 'Erinnerung(en)'} verschickt.`);
