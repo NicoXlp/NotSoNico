@@ -25,3 +25,16 @@ jobs:
             VAPID_PRIVATE_KEY
         env:
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+      - name: Gesundheitscheck
+        run: |
+          for i in 1 2 3 4 5 6; do
+            out=$(curl -s --max-time 10 https://vermietertagebuch-push.niccoseiddel-2001.workers.dev/ || true)
+            echo "Antwort: $out"
+            echo "$out" | grep -q '"ok":true' && break
+            sleep 5
+          done
+          echo "$out" | grep -q '"ok":true'
+          echo "CORS-Vorabfrage:"
+          curl -s -o /dev/null -D - -X OPTIONS -H "Origin: https://nicoxlp.github.io" -H "Access-Control-Request-Method: POST" https://vermietertagebuch-push.niccoseiddel-2001.workers.dev/notify | grep -i "^HTTP\|access-control-allow-origin"
+          echo "Ohne gültige Anmeldung (soll 401 sein):"
+          curl -s -w " HTTP %{http_code}\n" -X POST -H "Content-Type: application/json" -H "Authorization: Bearer test" -d '{"hid":"XXXXX-XXXXX","event":{"title":"x","actor":"y"}}' https://vermietertagebuch-push.niccoseiddel-2001.workers.dev/notify

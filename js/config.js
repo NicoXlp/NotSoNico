@@ -42,4 +42,4 @@ export const VAPID_PUBLIC_KEY = "BOXqILMyroyP1ncj5lTsN-C4yZmwPvyvNAKweRsGKQce3ht
 //  Ohne Eintrag verschickt die GitHub Action die Mitteilungen alle 5 Minuten.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const PUSH_WORKER_URL = null;
+export const PUSH_WORKER_URL = "https://vermietertagebuch-push.niccoseiddel-2001.workers.dev";
