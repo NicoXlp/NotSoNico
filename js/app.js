@@ -537,7 +537,13 @@ function toggleViewportDiag(on = !LS.get('vpdiag', false)) {
   upd();
   diagTimer = setInterval(upd, 250);
 }
-if (LS.get('vpdiag', false)) setTimeout(() => toggleViewportDiag(true), 500);
+/** Diagnose nur für Nico (Haus-Admin) – andere sehen und nutzen sie nicht */
+function syncViewportDiag() {
+  const allowed = state.ready && state.me && houseAdmin() === state.me;
+  const shown = !!document.getElementById('vpdiag');
+  if (allowed && LS.get('vpdiag', false) && !shown) toggleViewportDiag(true);
+  if (!allowed && shown) { document.getElementById('vpdiag').remove(); clearInterval(diagTimer); }
+}
 window.visualViewport?.addEventListener('resize', () => { if (!typing()) settleViewport(); });
 // Während ein Fenster offen ist, darf die Seite dahinter nicht wegrutschen (iOS verschiebt sie beim Tippen)
 window.addEventListener('scroll', () => { if (scrollLocked && !typing() && Math.abs(window.scrollY - lockY) > 1) settleViewport(); }, { passive: true });
@@ -868,6 +874,7 @@ function renderNow(animate) {
   if (!state.ready) return;
   ensureDmSub();
   refilterTasks();
+  syncViewportDiag();
   markChatTasksPrivate();
   const v = $('#view');
   v.innerHTML = VIEWS[state.tab]();
@@ -1891,7 +1898,7 @@ const VIEWS = {
         <button data-act="cloud">${I.cloud}<span>Synchronisierung<span class="desc">${esc(mode)}</span></span></button>
         <button data-act="house-rename">${I.pen}<span>Haus umbenennen</span></button>
         <button data-act="export">${I.download}<span>Backup herunterladen<span class="desc">Alle Daten als JSON-Datei</span></span></button>
-        <button data-act="vpdiag">${I.cal}<span>Anzeige-Diagnose<span class="desc">${LS.get('vpdiag', false) ? 'An – Messwerte oben links' : 'Aus – nur zur Fehlersuche'}</span></span></button>
+        ${houseAdmin() === state.me ? `<button data-act="vpdiag">${I.cal}<span>Anzeige-Diagnose<span class="desc">${LS.get('vpdiag', false) ? 'An – Messwerte oben links' : 'Aus – nur zur Fehlersuche'}</span></span></button>` : ''}
         <button data-act="import">${I.upload}<span>Backup wiederherstellen</span></button>
         <button data-act="switch-user">${I.user}<span>Profil wechseln<span class="desc">Angemeldet als ${esc(me()?.name || '–')}</span></span></button>
         <button class="danger" data-act="leave">${I.door}<span>Haus auf diesem Gerät verlassen</span></button>
@@ -3687,7 +3694,7 @@ const ACTIONS = {
   profile: () => memberSheet(state.me),
   add: () => onFab(),
   dms: () => dmListSheet(),
-  vpdiag: () => { toggleViewportDiag(); renderNow(false); toast(LS.get('vpdiag', false) ? '🔧 Diagnose an – oben links erscheinen Messwerte' : 'Diagnose aus'); },
+  vpdiag: () => { if (houseAdmin() !== state.me) return; toggleViewportDiag(); renderNow(false); toast(LS.get('vpdiag', false) ? '🔧 Diagnose an – oben links erscheinen Messwerte' : 'Diagnose aus'); },
   'dm-open': (d) => chatSheet(d.id),
   'goto-tasks': (d) => { state.taskView = 'open'; state.taskPerson = d.v; switchTab('tasks'); },
   'goto-person': (d) => { state.taskView = 'open'; state.taskPerson = d.id === state.me ? 'mine' : d.id; switchTab('tasks'); },
