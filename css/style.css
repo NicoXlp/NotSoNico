@@ -1536,3 +1536,12 @@ html.sheet-open, html.sheet-open body { overflow: hidden; overscroll-behavior: n
 .fb-vote:active { transform: scale(.9); }
 .fb-more { margin: 8px 4px 0; font-size: 14px; font-weight: 650; color: var(--accent); }
 @media (max-width: 340px) { .fb-actions { grid-template-columns: 1fr; } }
+
+/* Meldung als Karte im Privatchat */
+.dm-fb { display: grid; gap: 2px; text-align: left; min-width: 220px; max-width: 100%; }
+.dm-fb .eyebrow-s { font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .04em; }
+.dm-fb .title { font-weight: 650; overflow-wrap: anywhere; }
+.dm-fb .sub { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 13px; color: var(--text-2); margin-top: 4px; }
+.dm-fb .sub .pill.blue { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.dm-fb .sub .pill.green { background: color-mix(in srgb, var(--success) 18%, transparent); color: var(--success); }
+.dm-fb-go { margin-left: auto; font-weight: 650; color: var(--accent); }
