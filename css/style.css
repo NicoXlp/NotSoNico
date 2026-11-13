@@ -560,12 +560,15 @@ a { color: var(--accent); }
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
 .cal-grid .wd { font-size: 11px; font-weight: 700; color: var(--text-3); padding-bottom: 4px; }
 .cal-day {
-  aspect-ratio: 1; border-radius: 12px; display: grid; align-content: center; justify-items: center; gap: 3px;
-  font-size: 14px; font-weight: 550; position: relative;
+  aspect-ratio: 1; border-radius: 12px; display: grid; place-items: center;
+  font-size: 14px; font-weight: 550; line-height: 1; position: relative;
 }
 .cal-day.out { opacity: .3; }
 .cal-day.today { background: var(--accent); color: #fff; font-weight: 800; }
-.cal-day .dots { display: flex; gap: 2px; height: 6px; }
+/* Zahl exakt mittig; die Farbpunkte schweben unten, ohne die Zahl zu verschieben */
+.cal-day .dots { position: absolute; left: 50%; bottom: 12%; transform: translateX(-50%); display: flex; gap: 2px; height: 5px; }
+.cal-day .dots:empty { display: none; }
+.cal-day .dots i { width: 5px !important; height: 5px !important; }
 .cal-day .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 1px rgba(255,255,255,.6); }
 .cal-day.has { cursor: pointer; }
 .cal-day.has:active { background: var(--fill); }
