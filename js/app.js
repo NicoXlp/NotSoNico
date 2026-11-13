@@ -444,17 +444,40 @@ function fixIosGap() {
   if (typing()) return;
   const vvGap = vvOverflow();
   if (vvGap > 2) { setGap(vvGap); return; }
-  if (!kbArmed || kbBaseH == null) { setGap(0); return; }
+  // Das App-Fenster selbst ist kleiner geworden (iPhone): dort kann die App nichts hinmalen –
+  // also NICHT verschieben, sondern das iPhone dazu bringen, das Fenster wieder groß zu machen.
+  setGap(0);
+  if (!kbArmed || kbBaseH == null) return;
   const gap = kbBaseH - window.innerHeight;
   clearTimeout(kbDisarm);
   if (gap <= 2) {
-    setGap(0);
-    // Volle Höhe ist zurück → Browser hat sich erholt (kurz nach dem Schließen noch abwarten)
     if (Date.now() - kbClosedAt > 400) kbArmed = false;
     else kbDisarm = setTimeout(fixIosGap, 450);
     return;
   }
-  setGap(gap);
+  restoreWebview();
+}
+/* Ahmt das „Anziehen“ der Seite nach, das das iPhone zum Neuberechnen bringt:
+   Scrollsperre kurz lösen, Seite minimal scrollbar machen, 1 px hin und zurück scrollen. */
+let restoreTries = 0, restoreBusy = false;
+function restoreWebview() {
+  if (restoreBusy || typing() || restoreTries > 12) return;
+  restoreBusy = true; restoreTries++;
+  const html = document.documentElement, body = document.body;
+  const locked = html.classList.contains('sheet-open');
+  const y = window.scrollY;
+  html.classList.remove('sheet-open');
+  const prevMin = body.style.minHeight;
+  body.style.minHeight = `calc(100vh + ${y + 4}px)`;
+  window.scrollTo(0, y + 2);
+  (document.scrollingElement || html).scrollTop = y + 2;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    window.scrollTo(0, y);
+    (document.scrollingElement || html).scrollTop = y;
+    body.style.minHeight = prevMin;
+    if (locked && scrollLocked) html.classList.add('sheet-open');
+    restoreBusy = false;
+  }));
 }
 function nudgeViewport() {
   // Viewport-Angabe kurz neu setzen: bringt Safari dazu, die Höhe neu zu berechnen
@@ -466,6 +489,7 @@ function nudgeViewport() {
 }
 document.addEventListener('focusin', (e) => {
   if (!isTextField(e.target)) return;
+  restoreTries = 0;
   if (!kbArmed) kbBaseH = window.innerHeight; // Höhe ohne Tastatur merken
   setGap(0);
 });
@@ -506,7 +530,7 @@ function toggleViewportDiag(on = !LS.get('vpdiag', false)) {
       `iH ${innerHeight}  cH ${document.documentElement.clientHeight}  scr ${screen.width}×${screen.height}`,
       `vv ${vv ? `${Math.round(vv.width)}×${Math.round(vv.height)} top ${Math.round(vv.offsetTop)} scale ${vv.scale.toFixed(2)}` : '–'}`,
       `scrollY ${Math.round(scrollY)}  gap ${getComputedStyle(document.documentElement).getPropertyValue('--ios-gap').trim() || '0'}  over ${vvOverflow()}`,
-      `kb ${kbArmed ? 'an' : 'aus'} base ${kbBaseH ?? '–'}  tippt ${typing() ? 'ja' : 'nein'}  app ${navigator.standalone === true || matchMedia('(display-mode: standalone)').matches ? 'ja' : 'nein'}`,
+      `kb ${kbArmed ? 'an' : 'aus'} base ${kbBaseH ?? '–'}  versuche ${restoreTries}  tippt ${typing() ? 'ja' : 'nein'}  app ${navigator.standalone === true || matchMedia('(display-mode: standalone)').matches ? 'ja' : 'nein'}`,
       `Leiste unten ${dock ? Math.round(innerHeight - dock.bottom) : '–'}  Fenster unten ${sw ? Math.round(innerHeight - sw.bottom) : '–'}`,
     ].join('\n');
   };
