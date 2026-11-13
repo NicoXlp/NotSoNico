@@ -1691,11 +1691,7 @@ const VIEWS = {
       <div class="label" style="margin:14px 6px 8px">Farbschema</div>
       ${paletteHtml()}
 
-      <h2 class="section-title">Wünsche & Bugs</h2>
-      <div class="field" style="margin-bottom:6px"><label for="fb-owner">Meldungen werden zugestellt an</label>
-        <select id="fb-owner">${membersSorted().map((m) => `<option value="${m.id}" ${m.id === fbOwner() ? 'selected' : ''}>${esc(m.emoji || '')} ${esc(dn(m.id))}${m.id === state.me ? ' (du)' : ''}</option>`).join('')}</select></div>
-      <p class="small muted" style="margin:0 6px">Neue Bugs & Wünsche kommen bei dieser Person als Privatnachricht und Mitteilung an. Wer etwas gemeldet hat, erfährt, wenn sich der Status ändert.</p>
-
+      ${fbOwnerSettings()}
       <h2 class="section-title">Privatsphäre</h2>
       ${toggle('pres-on', '🟢 Online-Status anzeigen', !presenceHidden())}
       <p class="small muted" style="margin:-4px 6px 0">Wenn aus, sehen die anderen nicht, ob du gerade online bist oder wann du zuletzt da warst. Gilt für alle deine Geräte.</p>
@@ -2197,6 +2193,19 @@ function fbOwner() {
 const FB_STATUS = { open: ['Offen', ''], doing: ['In Arbeit', 'blue'], done: ['Erledigt', 'green'] };
 // Jede:r sieht nur die eigenen Meldungen – nur die zuständige Person (Standard: Nico) sieht alle
 const fbIsOwner = () => fbOwner() === state.me;
+/** Einstellung „Meldungen werden zugestellt an“ – nur für Nico sichtbar */
+/** Wer verwaltet das Haus? Fest: Nico (bzw. die erste Person im Haus) */
+function houseAdmin() {
+  if (state.house?.admin && member(state.house.admin)) return state.house.admin;
+  return (state.members.find((m) => /^nico\b/i.test(String(m.name || '').trim())) || membersSorted()[0])?.id || null;
+}
+function fbOwnerSettings() {
+  if (houseAdmin() !== state.me) return '';
+  return `      <h2 class="section-title">Wünsche & Bugs</h2>
+      <div class="field" style="margin-bottom:6px"><label for="fb-owner">Meldungen werden zugestellt an</label>
+        <select id="fb-owner">${membersSorted().map((m) => `<option value="${m.id}" ${m.id === fbOwner() ? 'selected' : ''}>${esc(m.emoji || '')} ${esc(dn(m.id))}${m.id === state.me ? ' (du)' : ''}</option>`).join('')}</select></div>
+      <p class="small muted" style="margin:0 6px">Neue Bugs & Wünsche kommen bei dieser Person als Privatnachricht und Mitteilung an. Wer etwas gemeldet hat, erfährt, wenn sich der Status ändert.</p>`;
+}
 const fbVisible = () => (fbIsOwner() ? state.feedback : state.feedback.filter((f) => f.author === state.me));
 const fbSorted = () => [...fbVisible()].sort((a, b) =>
   (a.status === 'done') - (b.status === 'done') || (b.createdAt || 0) - (a.createdAt || 0));
@@ -3939,6 +3948,7 @@ setInterval(() => { if (!document.hidden) beat(true); if (state.ready && presenc
 document.addEventListener('change', (e) => { if (e.target.id === 'pres-on') setPresenceVisible(e.target.checked); });
 document.addEventListener('change', async (e) => {
   if (e.target.id !== 'fb-owner') return;
+  if (houseAdmin() !== state.me) return; // nur Nico darf das ändern
   state.house = { ...(state.house || {}), feedbackTo: e.target.value };
   try { await store.setHouse(state.house); toast(`💡 Meldungen gehen jetzt an ${dn(e.target.value)}`); } catch { toast('⚠️ Konnte nicht speichern'); }
 });
