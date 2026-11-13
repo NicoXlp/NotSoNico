@@ -1390,6 +1390,16 @@ function eventBody(p) {
    Neuen Eintrag oben einfügen → die Kachel zeigt immer den neuesten. */
 const NEWS = [
   {
+    id: '2026-11-13-fixes-3',
+    date: '2026-11-13',
+    label: '🛠️ Bug-Fixes',
+    items: [
+      { icon: '🖼️', title: 'Kein Flackern mehr', text: 'Profilbilder blitzen beim Schieben der Regler nicht mehr gelb auf – auf allen Geräten.' },
+      { icon: '🔒', title: 'Private Aufgaben', text: 'Im Privatchat zugeteilte Aufgaben sehen nur noch ihr beide – auch die Mitteilungen dazu.' },
+      { icon: '🏷️', title: 'Erkennbar', text: 'Private Aufgaben tragen in der Liste ein „🔒 Privat“. Beim Anlegen lässt sich das auch selbst einschalten.', act: 'tab', v: 'tasks', btn: 'Zu den Aufgaben' },
+    ],
+  },
+  {
     id: '2026-11-13-feedback',
     date: '2026-11-13',
     label: '✨ Neue Funktionen',
