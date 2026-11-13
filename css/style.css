@@ -1069,3 +1069,30 @@ img.blur { filter: blur(14px) saturate(1.2); transform: scale(1.08); }
 .diag-row b.ok { color: var(--success); }
 .diag-row b.bad { color: var(--danger); }
 .palette > span:last-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 4px; }
+
+/* ─── Dezent statt leuchtend: keine farbigen Leuchtschatten, flache Knöpfe ── */
+.btn.primary { background: var(--accent-btn, var(--accent)); box-shadow: 0 1px 2px rgba(0, 0, 0, .12); }
+.voice .play { background: var(--accent-btn, var(--accent)); box-shadow: 0 1px 2px rgba(0, 0, 0, .12); }
+.bin-icon { background: var(--c); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 1px 2px rgba(0, 0, 0, .12); }
+.bell.on { background: #f08c2e; box-shadow: 0 1px 2px rgba(0, 0, 0, .12); }
+.av { box-shadow: 0 1px 2px rgba(0, 0, 0, .12); }
+.online-dot { box-shadow: 0 0 0 2px var(--bg); }
+.logo { box-shadow: 0 4px 12px rgba(0, 0, 0, .14); }
+.hero-trash.soon { box-shadow: var(--glass-shadow), var(--glass-inner), 0 0 0 1.5px color-mix(in srgb, var(--warning) 40%, transparent); }
+.rec-btn { background: #e5484d; box-shadow: 0 1px 3px rgba(0, 0, 0, .18), 0 0 0 5px var(--glass-bg); }
+.recording .rec-btn { animation: recPulseCalm 1.4s ease-in-out infinite; }
+@keyframes recPulseCalm { 50% { box-shadow: 0 1px 3px rgba(0, 0, 0, .18), 0 0 0 9px rgba(229, 72, 77, .14); } }
+.done-btn.on, .switch input:checked + span { box-shadow: none; }
+/* Glas-Linsen (Navigationsleiste & Umschalter): feinere, ruhigere Ränder */
+.lens-glass, .thumb-glass {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), inset 0 -1px 0 rgba(255, 255, 255, .12), 0 2px 8px rgba(0, 0, 0, .08);
+}
+.lens-glass::before, .thumb-glass::before {
+  background: linear-gradient(120deg, rgba(255,255,255,.55), rgba(255,255,255,.08) 40%, rgba(255,255,255,.08) 60%, rgba(255,255,255,.4));
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .lens-glass, :root:not([data-theme="light"]) .thumb-glass { background: rgba(255, 255, 255, .1); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18), 0 2px 8px rgba(0, 0, 0, .25); }
+  :root:not([data-theme="light"]) .lens-glass::before, :root:not([data-theme="light"]) .thumb-glass::before { background: linear-gradient(120deg, rgba(255,255,255,.28), rgba(255,255,255,.04) 40%, rgba(255,255,255,.04) 60%, rgba(255,255,255,.2)); }
+}
+:root[data-theme="dark"] .lens-glass, :root[data-theme="dark"] .thumb-glass { background: rgba(255, 255, 255, .1); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18), 0 2px 8px rgba(0, 0, 0, .25); }
+:root[data-theme="dark"] .lens-glass::before, :root[data-theme="dark"] .thumb-glass::before { background: linear-gradient(120deg, rgba(255,255,255,.28), rgba(255,255,255,.04) 40%, rgba(255,255,255,.04) 60%, rgba(255,255,255,.2)); }

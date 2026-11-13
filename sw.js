@@ -1,5 +1,5 @@
 // Service Worker: Offline-Cache + Push-Mitteilungen für die Müll-Erinnerungen
-const CACHE = 'vermietertagebuch-v26';
+const CACHE = 'vermietertagebuch-v27';
 const ASSETS = [
   './', './index.html', './css/style.css', './js/app.js', './js/store.js', './js/ics.js', './js/config.js', './js/trash-logic.js', './js/media.js', './js/compat.js',
   './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
@@ -21,7 +21,7 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
   e.respondWith(
-    fetch(req)
+    fetch(req, { cache: 'no-cache' }) // immer beim Server nachfragen, damit Updates sofort ankommen
       .then((res) => {
         if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
         return res;
