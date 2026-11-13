@@ -59,7 +59,8 @@ Die Erinnerungen werden **stündlich per GitHub Action** verschickt (`.github/wo
    | `VAPID_PRIVATE_KEY` | Private Key aus Schritt 1 (**geheim halten!**) |
    | `VAPID_SUBJECT` | optional, z. B. `mailto:ihr@example.com` |
 
-5. In der App: **Müll → Erinnerungen einschalten**, Uhrzeit wählen, speichern.
+5. Im selben Bereich unter dem Reiter **Variables** die Variable `PUSH_ENABLED` mit dem Wert `true` anlegen – erst dann startet der stündliche Versand.
+6. In der App: **Müll → Erinnerungen einschalten**, Uhrzeit wählen, speichern.
 
 **iPhone/iPad:** Push funktioniert ab iOS 16.4 nur, wenn die App über **Teilen → „Zum Home-Bildschirm“** installiert und von dort geöffnet wurde.
 
