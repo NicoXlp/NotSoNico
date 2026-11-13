@@ -2764,7 +2764,7 @@ let splashShownAt = performance.now();
 function hideSplash({ now = false } = {}) {
   const el = $('#splash');
   if (!el || el.classList.contains('out')) return;
-  const min = reducedMotion() ? 500 : 2300; // Animation einmal ganz zeigen
+  const min = reducedMotion() ? 500 : 2050; // Animation einmal ganz zeigen (Buch ist nach ~2 s aufgeschlagen)
   const wait = now ? 0 : Math.max(0, min - (performance.now() - splashShownAt));
   setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 650); }, wait);
 }
