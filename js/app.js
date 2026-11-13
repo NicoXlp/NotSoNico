@@ -1298,6 +1298,32 @@ function eventBody(p) {
 /* ═══════════════════════════════════════════════════════════════════════════
    Ansichten
    ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── „Neues“: Ankündigungen auf der Startseite ──────────────────────────────
+   Neuen Eintrag oben einfügen (neue id) → Kachel erscheint wieder bei allen. */
+const NEWS = [
+  {
+    id: '2026-11-13-dm',
+    date: '2026-11-13',
+    items: [
+      { icon: '💬', title: 'Privatnachrichten', text: 'Schreibt euch privat – mit Text oder Sprachnachricht. Nur ihr beide seht den Chat.', act: 'dms', btn: 'Nachrichten öffnen' },
+      { icon: '📋', title: 'Aufgaben zuteilen', text: 'Im Chat mit ☑️ eine Aufgabe für dein Gegenüber anlegen – sie kann direkt dort abgehakt werden.' },
+      { icon: '🏠', title: 'Wer wohnt wo?', text: 'Unter „Haus“ seht ihr alle nach Stockwerk – vom 1. OG bis in den Keller.', act: 'tab', v: 'house', btn: 'Ansehen' },
+    ],
+  },
+];
+function newsCard() {
+  const n = NEWS[0];
+  if (!n || LS.get('newsSeen') === n.id) return '';
+  return `<section class="card news-card">
+    <div class="news-head"><span class="news-badge">✨ Neu</span><h2>Neues</h2><span class="small muted">${esc(fmt(n.date, { day: 'numeric', month: 'long' }))}</span>
+      <button class="icon-btn" data-act="news-hide" aria-label="Neues ausblenden">${I.close}</button></div>
+    <div class="news-list">${n.items.map((it) => `<div class="news-item"><span class="news-ico">${it.icon}</span>
+      <div class="main"><div class="title">${esc(it.title)}</div><div class="small muted">${esc(it.text)}</div>
+      ${it.act ? `<button class="link news-btn" data-act="${it.act}" ${it.v ? `data-v="${it.v}"` : ''}>${esc(it.btn)} ›</button>` : ''}</div></div>`).join('')}</div>
+  </section>`;
+}
+
 const VIEWS = {
   home() {
     const m = me();
@@ -1316,6 +1342,7 @@ const VIEWS = {
 
     return `${header(fmtLong(today()), `${greeting()}, ${esc(m?.name || '')} ${esc(m?.emoji || '👋')}`)}
       ${localBanner()}
+      ${newsCard()}
       <div class="kpis">
         <button class="kpi card" data-act="goto-tasks" data-v="mine"><div class="n">${mine.length}</div><div class="l">Für dich offen</div></button>
         <button class="kpi card" data-act="goto-tasks" data-v="all"><div class="n">${todayCount}</div><div class="l">Heute fällig</div></button>
@@ -2910,6 +2937,7 @@ const ACTIONS = {
   profile: () => memberSheet(state.me),
   add: () => onFab(),
   dms: () => dmListSheet(),
+  'news-hide': () => { LS.set('newsSeen', NEWS[0].id); renderNow(false); },
   'dm-open': (d) => chatSheet(d.id),
   'goto-tasks': (d) => { state.taskView = 'open'; state.taskPerson = d.v; switchTab('tasks'); },
   'goto-person': (d) => { state.taskView = 'open'; state.taskPerson = d.id === state.me ? 'mine' : d.id; switchTab('tasks'); },
