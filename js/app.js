@@ -1300,7 +1300,7 @@ function eventBody(p) {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ─── „Neues“: Ankündigungen auf der Startseite ──────────────────────────────
-   Neuen Eintrag oben einfügen (neue id) → Kachel erscheint wieder bei allen. */
+   Neuen Eintrag oben einfügen → die Kachel zeigt immer den neuesten. */
 const NEWS = [
   {
     id: '2026-11-13-dm',
@@ -1314,10 +1314,9 @@ const NEWS = [
 ];
 function newsCard() {
   const n = NEWS[0];
-  if (!n || LS.get('newsSeen') === n.id) return '';
+  if (!n) return '';
   return `<section class="card news-card">
-    <div class="news-head"><span class="news-badge">✨ Neu</span><h2>Neues</h2><span class="small muted">${esc(fmt(n.date, { day: 'numeric', month: 'long' }))}</span>
-      <button class="icon-btn" data-act="news-hide" aria-label="Neues ausblenden">${I.close}</button></div>
+    <div class="news-head"><span class="news-badge">✨ Neu</span><h2>Neues</h2><span class="small muted">${esc(fmt(n.date, { day: 'numeric', month: 'long' }))}</span></div>
     <div class="news-list">${n.items.map((it) => `<div class="news-item"><span class="news-ico">${it.icon}</span>
       <div class="main"><div class="title">${esc(it.title)}</div><div class="small muted">${esc(it.text)}</div>
       ${it.act ? `<button class="link news-btn" data-act="${it.act}" ${it.v ? `data-v="${it.v}"` : ''}>${esc(it.btn)} ›</button>` : ''}</div></div>`).join('')}</div>
@@ -2937,7 +2936,6 @@ const ACTIONS = {
   profile: () => memberSheet(state.me),
   add: () => onFab(),
   dms: () => dmListSheet(),
-  'news-hide': () => { LS.set('newsSeen', NEWS[0].id); renderNow(false); },
   'dm-open': (d) => chatSheet(d.id),
   'goto-tasks': (d) => { state.taskView = 'open'; state.taskPerson = d.v; switchTab('tasks'); },
   'goto-person': (d) => { state.taskView = 'open'; state.taskPerson = d.id === state.me ? 'mine' : d.id; switchTab('tasks'); },
