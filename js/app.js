@@ -185,7 +185,7 @@ function avatar(id, size = 32) {
   const m = member(id);
   if (!m) return `<span class="av" style="--s:${size}px;--c:#8e8e93">?</span>`;
   const dot = size >= 20 && id !== state.me && presenceOf(id)?.online ? '<i class="online-dot" aria-label="online"></i>' : '';
-  if (m.photo) return `<span class="av photo" style="--s:${size}px;--c:${esc(m.color)}" title="${esc(dn(id))}"><img src="${esc(m.photo)}" alt="" loading="lazy" decoding="async">${dot}</span>`;
+  if (m.photo) return `<span class="av photo" role="img" aria-label="${esc(dn(id))}" style="--s:${size}px;--c:${esc(m.color)};background-image:url(${esc(m.photo)})" title="${esc(dn(id))}">${dot}</span>`;
   return `<span class="av" style="--s:${size}px;--c:${esc(m.color)}" title="${esc(dn(id))}">${esc(m.emoji || m.name.slice(0, 1))}${dot}</span>`;
 }
 
@@ -720,6 +720,8 @@ function render() {
 function renderNow(animate) {
   if (!state.ready) return;
   ensureDmSub();
+  refilterTasks();
+  markChatTasksPrivate();
   const v = $('#view');
   v.innerHTML = VIEWS[state.tab]();
   const ns = $('.news-scroll', v);
@@ -748,6 +750,16 @@ function localBanner() {
 }
 
 /* ─── Aufgaben-Logik ─────────────────────────────────────────────────────── */
+/** Private Aufgaben (im Privatchat zugeteilt) sehen nur die beiden Beteiligten */
+const taskVisible = (t) => !t.private || t.createdBy === state.me || t.assignee === state.me;
+let tasksRaw = null, tasksFor = null;
+function refilterTasks(force = false) {
+  if (!tasksRaw || (!force && tasksFor === state.me)) return;
+  tasksFor = state.me;
+  state.tasks = tasksRaw.filter(taskVisible);
+}
+/** Empfänger:innen einer Mitteilung zu einer Aufgabe: bei privaten nur die andere beteiligte Person */
+const taskAudience = (t) => (t?.private ? [t.createdBy, t.assignee].filter((x) => x && x !== state.me) : null);
 const openTasks = () => state.tasks.filter((t) => !t.done);
 const myOpenTasks = () => openTasks().filter((t) => t.assignee === state.me || !t.assignee);
 const sortTasks = (a, b) => (a.due || '9999') .localeCompare(b.due || '9999') || (b.important ? 1 : 0) - (a.important ? 1 : 0) || (a.createdAt || 0) - (b.createdAt || 0);
@@ -776,12 +788,12 @@ function toggleTask(id) {
       return { ...cur, due, assignee, history, lastDoneBy: state.me, lastDoneAt: Date.now() };
     });
     toast(`✓ Erledigt – nächstes Mal ${fmtDay(nd)}`);
-    emit('task_done', { title: `✅ ${myName()} hat eine Aufgabe erledigt`, body: t.title, tab: 'tasks' });
+    if (!t.private || taskAudience(t).length) emit('task_done', { title: `✅ ${myName()} hat eine Aufgabe erledigt`, body: t.title, tab: 'tasks', to: taskAudience(t) });
   } else {
     mutate('tasks', id, (cur) => ({ ...cur, done: !cur.done, doneBy: cur.done ? null : state.me, doneAt: cur.done ? null : Date.now() }));
     if (!t.done) {
       toast('✓ Erledigt – super!');
-      emit('task_done', { title: `✅ ${myName()} hat eine Aufgabe erledigt`, body: t.title, tab: 'tasks' });
+      if (!t.private || taskAudience(t).length) emit('task_done', { title: `✅ ${myName()} hat eine Aufgabe erledigt`, body: t.title, tab: 'tasks', to: taskAudience(t) });
     }
   }
 }
@@ -798,7 +810,7 @@ function taskRow(t) {
   return `<div class="list-item task ${t.done ? 'done' : ''}">
     <button class="check ${t.done ? 'on' : ''}" data-act="task-toggle" data-id="${t.id}" aria-label="${t.done ? 'Wieder öffnen' : 'Erledigen'}">${I.check}</button>
     <button class="main" data-act="task-edit" data-id="${t.id}" style="text-align:left">
-      <div class="title">${t.important ? `<span class="star">★</span> ` : ''}${esc(t.title)}</div>
+      <div class="title">${t.important ? `<span class="star">★</span> ` : ''}${esc(t.title)}${t.private ? ' <span class="pill priv" title="Nur ihr beide seht diese Aufgabe">🔒 Privat</span>' : ''}</div>
       <div class="sub">${t.done
         ? `<span>✓ ${esc(nameOf(t.doneBy))} · ${relTime(t.doneAt || Date.now())}</span>`
         : `${dueInfo(t)}${t.repeat && t.repeat !== 'none' ? `<span class="pill">${I.repeat}${REPEAT[t.repeat]}${t.rotate ? ' · reihum' : ''}</span>` : ''}${t.notes ? `<span>${esc(t.notes.slice(0, 60))}${t.notes.length > 60 ? '…' : ''}</span>` : ''}`}
@@ -1864,6 +1876,18 @@ function dmDelete(m) {
   if (m.voice?.audioId) store.remove('audio', m.voice.audioId).catch(() => {});
 }
 
+/** Aufgaben, die (vor dieser Änderung) im Privatchat zugeteilt wurden, nachträglich privat machen */
+const chatTaskChecked = new Set();
+function markChatTasksPrivate() {
+  for (const m of state.messages) {
+    if (!m.taskId || chatTaskChecked.has(m.taskId)) continue;
+    const t = state.tasks.find((x) => x.id === m.taskId);
+    if (!t) continue;
+    chatTaskChecked.add(m.taskId);
+    if (t.private === undefined && (m.members || []).includes(t.createdBy)) mutate('tasks', t.id, (x) => (x.private === undefined ? { ...x, private: true } : x));
+  }
+}
+
 function chatSheet(id) {
   const other = member(id);
   if (!other || id === state.me) return;
@@ -1915,6 +1939,7 @@ function chatSheet(id) {
       };
       $('#dm-task', f).onclick = () => taskSheet(null, {
         assignee: id,
+        private: true,
         title: `Aufgabe für ${dn(id)}`,
         onCreate: (taskId) => sendDm(id, { taskId }, { push: false }),
       });
@@ -2355,6 +2380,7 @@ function taskSheet(id, preset = {}) {
       <div class="field"><label for="t-rep">Wiederholen</label><select id="t-rep">${Object.entries(REPEAT).map(([k, l]) => `<option value="${k}" ${v.repeat === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
       <div id="rot-wrap" ${v.repeat === 'none' ? 'hidden' : ''}>${toggle('t-rot', '🔄 Reihum weitergeben (nach jedem Erledigen ist die nächste Person dran)', v.rotate)}</div>
       ${toggle('t-imp', '⭐ Wichtig', v.important)}
+      <div id="priv-wrap" ${v.assignee && v.assignee !== state.me ? '' : 'hidden'}>${toggle('t-priv', '🔒 Privat – nur ihr beide seht diese Aufgabe', t ? !!t.private : !!preset.private)}</div>
       ${t?.history?.length ? `<div class="label" style="margin:14px 0 6px">Zuletzt erledigt</div><div class="small muted">${t.history.slice(0, 5).map((h) => `${esc(nameOf(h.by))} · ${relTime(h.at)}`).join('<br>')}</div>` : ''}
       ${t ? `<p class="small muted" style="margin-top:10px">Erstellt von ${esc(nameOf(t.createdBy))} · ${relTime(t.createdAt)}</p>` : ''}
       <div class="sheet-actions">
@@ -2364,6 +2390,7 @@ function taskSheet(id, preset = {}) {
     </form>`,
     onMount: (api) => {
       const f = $('#f', api.el);
+      $('#t-who', f).addEventListener('change', (e) => { $('#priv-wrap', f).hidden = !e.target.value || e.target.value === state.me; });
       $('#t-rep', f).onchange = (e) => { $('#rot-wrap', f).hidden = e.target.value === 'none'; };
       f.onsubmit = (e) => {
         e.preventDefault();
@@ -2375,6 +2402,7 @@ function taskSheet(id, preset = {}) {
           repeat: $('#t-rep', f).value,
           rotate: $('#t-rep', f).value !== 'none' && $('#t-rot', f).checked,
           important: $('#t-imp', f).checked,
+          private: !!($('#t-who', f).value && $('#t-who', f).value !== state.me && $('#t-priv', f).checked),
         };
         if (!data.title) return;
         if (data.repeat !== 'none' && !data.due) data.due = today();
@@ -2386,7 +2414,7 @@ function taskSheet(id, preset = {}) {
           const nid = addDoc('tasks', { ...data, done: false, createdBy: state.me, createdAt: Date.now() });
           preset.onCreate?.(nid, data);
           const forWho = data.assignee ? (data.assignee === state.me ? ` (für ${myName()})` : ` · für ${member(data.assignee)?.name || '?'}`) : ' · für alle';
-          const others = memberIds().filter((x) => x !== state.me && x !== assigned);
+          const others = data.private ? [] : memberIds().filter((x) => x !== state.me && x !== assigned);
           if (others.length) emit('task_new', { title: `📝 Neue Aufgabe von ${myName()}`, body: `${data.title}${forWho}${dueTxt}`, to: others, tab: 'tasks' });
         }
         haptic(10);
@@ -3846,6 +3874,7 @@ async function connect(hid, { create } = {}) {
 
   for (const col of COLLECTIONS) {
     store.subscribe(col, (list, meta) => {
+      if (col === 'tasks') { tasksRaw = list; tasksFor = state.me; list = list.filter(taskVisible); }
       state[col] = list;
       state.loaded.add(col);
       if (!meta?.fromCache) state.synced.add(col);
