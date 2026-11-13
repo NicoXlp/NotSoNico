@@ -1405,3 +1405,9 @@ html.sheet-open, html.sheet-open body { overflow: hidden; overscroll-behavior: n
   .dm-sheet .sheet { height: 100%; max-height: none; border-radius: 28px; padding-bottom: 0; }
   .dm-sheet .sheet-body { padding-bottom: 12px; }
 }
+
+/* Fremdes Profil: nur Ansicht */
+.profile-view { display: grid; justify-items: center; gap: 4px; text-align: center; margin: 0 0 16px; }
+.profile-view .av { margin-bottom: 6px; }
+.pv-name { font-size: 22px; font-weight: 750; letter-spacing: -.01em; }
+.btn.danger-soft { margin-top: 18px; background: transparent; box-shadow: none; color: var(--danger); font-weight: 600; }
