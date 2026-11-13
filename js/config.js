@@ -35,4 +35,4 @@ export const FIREBASE_CONFIG = {
 //  Der PRIVATE Schlüssel gehört NICHT hierher, sondern als Secret zu GitHub.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const VAPID_PUBLIC_KEY = null;
+export const VAPID_PUBLIC_KEY = "BOXqILMyroyP1ncj5lTsN-C4yZmwPvyvNAKweRsGKQce3htDmYGOCpbJh84rZUififSUPcwxpd26j1R42tEaXy4";

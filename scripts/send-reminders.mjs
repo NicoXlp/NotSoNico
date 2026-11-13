@@ -20,7 +20,7 @@ if (!FIREBASE_SERVICE_ACCOUNT || !VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
 
 admin.initializeApp({ credential: admin.credential.cert(JSON.parse(FIREBASE_SERVICE_ACCOUNT)) });
 const db = admin.firestore();
-webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:noreply@vermietertagebuch.app', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'https://nicoxlp.github.io/Vermietertagebuch-App/', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
 const load = (ref, col) => ref.collection(col).get().then((s) => s.docs.map((d) => ({ ...d.data(), id: d.id })));
 let sentTotal = 0;
