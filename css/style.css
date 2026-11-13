@@ -117,6 +117,78 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
 svg { display: block; }
 a { color: var(--accent); }
 
+/* ─── Startanimation: Tagebuch schlägt sich auf ───────────────────────────── */
+.splash {
+  position: fixed; inset: 0; z-index: 1000;
+  display: grid; place-items: center;
+  background: radial-gradient(90% 60% at 25% 10%, rgba(255,255,255,.22), transparent 60%), linear-gradient(135deg, #5a6be0, #8f7ff0);
+  color: #fff;
+  transition: opacity .5s ease, transform .6s cubic-bezier(.4, 0, .2, 1);
+  -webkit-user-select: none; user-select: none;
+}
+.splash.out { opacity: 0; transform: scale(1.15); pointer-events: none; }
+.sp-stage { display: grid; justify-items: center; -webkit-perspective: 1200px; perspective: 1200px; }
+.sp-float { animation: spIn .55s cubic-bezier(.2, .9, .3, 1.2) both; }
+.sp-book {
+  --w: 132px; --h: 182px;
+  position: relative; width: calc(var(--w) * 2); height: var(--h);
+  -webkit-transform-style: preserve-3d; transform-style: preserve-3d;
+  transform: rotateX(14deg);
+  animation: spShift 1s .35s cubic-bezier(.6, .05, .25, 1) both;
+}
+.sp-page, .sp-leaf {
+  position: absolute; top: 0; left: 50%; width: var(--w); height: var(--h);
+  -webkit-transform-style: preserve-3d; transform-style: preserve-3d;
+}
+.sp-base, .sp-face {
+  border-radius: 3px 12px 12px 3px;
+  background: linear-gradient(90deg, #e3e6fb, #fff 18%);
+  box-shadow: 0 18px 40px rgba(30, 30, 90, .35);
+  padding: 30px 16px 0 20px;
+  display: flex; flex-direction: column; gap: 13px;
+}
+.sp-leaf { transform-origin: left center; }
+.sp-face { position: absolute; inset: 0; -webkit-backface-visibility: hidden; backface-visibility: hidden; box-shadow: none; }
+.sp-back { transform: rotateY(180deg); border-radius: 12px 3px 3px 12px; background: linear-gradient(270deg, #e3e6fb, #fff 18%); align-items: center; justify-content: center; padding: 0; }
+.sp-line { display: block; height: 7px; border-radius: 4px; background: rgba(90, 107, 224, .32); }
+.sp-line.short { width: 60%; }
+.sp-back .sp-line { width: 70%; }
+.sp-house { width: 56px; height: 56px; color: #5a6be0; }
+.sp-ribbon { position: absolute; left: -7px; bottom: -26px; width: 14px; height: 34px; background: #ff8a7a; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%); transform-origin: top; animation: spRibbon .45s 1.5s ease-out both; }
+
+/* Einband */
+.sp-cover .sp-front {
+  border-radius: 4px 14px 14px 4px;
+  background: radial-gradient(120% 80% at 20% 0%, rgba(255,255,255,.35), transparent 55%), linear-gradient(160deg, #6d7cf0, #4a57c9);
+  box-shadow: inset 6px 0 10px rgba(0,0,0,.18), inset 0 1px 1px rgba(255,255,255,.5), 0 20px 40px rgba(20, 20, 80, .45);
+  align-items: center; justify-content: center; padding: 0;
+}
+.sp-cover-house { width: 58px; height: 58px; color: rgba(255,255,255,.92); }
+.sp-cover .sp-back { background: linear-gradient(270deg, #cfd4f6, #eef0fd 22%); }
+
+/* Reihenfolge im geschlossenen Buch: Einband oben, darunter die Seiten */
+.sp-cover { transform: rotateY(0) translateZ(3px); animation: spFlip .95s .4s cubic-bezier(.55, .05, .3, 1) both; --end: -180deg; }
+.sp-leaf1 { transform: rotateY(0) translateZ(2px); animation: spFlip .8s .82s cubic-bezier(.55, .05, .3, 1) both; --end: -179deg; }
+.sp-leaf2 { transform: rotateY(0) translateZ(1px); animation: spFlip .8s 1.0s cubic-bezier(.55, .05, .3, 1) both; --end: -178deg; }
+
+.sp-title { margin-top: 46px; font-size: 26px; font-weight: 800; letter-spacing: -.01em; animation: spText .5s 1.45s ease-out both; text-shadow: 0 2px 12px rgba(30, 30, 90, .25); }
+.sp-sub { margin-top: 4px; font-size: 14px; font-weight: 600; opacity: .8; animation: spText .5s 1.6s ease-out both; }
+
+@keyframes spIn { from { opacity: 0; transform: translateY(18px) scale(.82); } }
+@keyframes spShift { from { transform: translateX(calc(var(--w) * -.5)) rotateX(14deg) rotateZ(-4deg); } to { transform: translateX(0) rotateX(14deg); } }
+@keyframes spFlip { to { transform: rotateY(var(--end)) translateZ(0); } }
+@keyframes spRibbon { from { transform: scaleY(0); } }
+@keyframes spText { from { opacity: 0; transform: translateY(8px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .sp-float, .sp-book, .sp-leaf, .sp-ribbon, .sp-title, .sp-sub { animation: none !important; }
+  .sp-cover { transform: rotateY(-180deg); }
+  .sp-leaf1 { transform: rotateY(-179deg); }
+  .sp-leaf2 { transform: rotateY(-178deg); }
+  .splash { animation: spFade .3s ease-out both; }
+  @keyframes spFade { from { opacity: 0; } }
+}
+
 /* ─── Hintergrund ─────────────────────────────────────────────────────────── */
 .backdrop { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
 .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .75; }
