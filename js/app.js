@@ -298,59 +298,81 @@ function buildTabbar() {
   const bar = $('#tabbar');
   bar.insertAdjacentHTML('beforeend', TABS.map((t) =>
     `<button class="tab" data-tab="${t.id}" aria-label="${t.label}">${t.icon}<span>${t.label}</span></button>`).join(''));
-  $('#fab').innerHTML = I.plus;
-  $('#fab').addEventListener('click', onFab);
 
+  // Die Linse: äußeres Element verschiebt (translateX), inneres Glas skaliert.
+  // Getrennt, damit Ziehen (direkt, ohne Verzögerung) und Größe (federnd) sich nicht stören.
   const lens = $('#lens');
   const tabs = () => $$('.tab', bar);
-  const placeLens = (idx) => {
-    const t = tabs()[idx];
-    if (!t) return;
-    lens.style.setProperty('--w', `${t.offsetWidth}px`);
-    lens.style.setProperty('--x', `${t.offsetLeft}px`);
+  const activeIdx = () => Math.max(0, TABS.findIndex((t) => t.id === state.tab));
+  let lensX = 0;
+  const setX = (x) => { lensX = x; lens.style.transform = `translate3d(${x}px,0,0)`; };
+  const geom = () => {
+    const n = tabs().length;
+    const pad = 5;
+    return { pad, n, w: (bar.clientWidth - pad * 2) / n };
   };
-  const activeIdx = () => TABS.findIndex((t) => t.id === state.tab);
-  window.addEventListener('resize', () => placeLens(activeIdx()));
-  new ResizeObserver(() => placeLens(activeIdx())).observe(bar);
+  const placeLens = (idx, animate = true) => {
+    const { pad, w } = geom();
+    lens.style.width = `${w}px`;
+    if (!animate) lens.classList.add('no-anim');
+    setX(pad + idx * w);
+    if (!animate) { void lens.offsetWidth; lens.classList.remove('no-anim'); }
+  };
 
-  let down = null, dragging = false, hoverIdx = -1;
-  const idxAt = (x) => {
+  let down = null, dragging = false, hoverIdx = -1, raf = 0, pendingX = null;
+  const idxAt = (clientX) => {
     const r = bar.getBoundingClientRect();
-    const list = tabs();
-    const w = (r.width - 10) / list.length;
-    return Math.max(0, Math.min(list.length - 1, Math.floor((x - r.left - 5) / w)));
+    const { pad, w, n } = geom();
+    return Math.max(0, Math.min(n - 1, Math.floor((clientX - r.left - pad) / w)));
+  };
+  new ResizeObserver(() => { if (!dragging) placeLens(activeIdx(), false); }).observe(bar);
+
+  const setHover = (hi) => {
+    if (hi === hoverIdx) return;
+    hoverIdx = hi;
+    tabs().forEach((t, i) => t.classList.toggle('hover', i === hi));
+    if (dragging && hi >= 0) haptic(4);
   };
   bar.addEventListener('pointerdown', (e) => {
-    down = { x: e.clientX, idx: idxAt(e.clientX) };
+    if (e.button > 0) return;
+    down = { x: e.clientX, idx: idxAt(e.clientX), id: e.pointerId, offset: 0 };
     dragging = false;
     bar.classList.add('pressed');
-    bar.setPointerCapture(e.pointerId);
+    try { bar.setPointerCapture(e.pointerId); } catch { /* egal */ }
   });
   bar.addEventListener('pointermove', (e) => {
-    if (!down) return;
-    if (!dragging && Math.abs(e.clientX - down.x) > 6) { dragging = true; bar.classList.add('dragging'); haptic(5); }
-    if (!dragging) return;
+    if (!down || e.pointerId !== down.id) return;
     const r = bar.getBoundingClientRect();
-    const w = lens.offsetWidth;
-    const x = Math.max(5, Math.min(r.width - w - 5, e.clientX - r.left - w / 2));
-    lens.style.setProperty('--x', `${x}px`);
-    const hi = idxAt(e.clientX);
-    if (hi !== hoverIdx) {
-      hoverIdx = hi;
-      tabs().forEach((t, i) => t.classList.toggle('hover', i === hi));
-      haptic(4);
+    const { pad, w } = geom();
+    if (!dragging) {
+      if (Math.abs(e.clientX - down.x) < 8) return;
+      dragging = true;
+      // Linse dort „anfassen“, wo der Finger sie gerade hält – kein Springen
+      down.offset = (down.x - r.left) - lensX;
+      if (down.offset < 0 || down.offset > w) down.offset = w / 2;
+      bar.classList.add('dragging');
+      haptic(5);
     }
+    pendingX = Math.max(pad, Math.min(bar.clientWidth - pad - w, e.clientX - r.left - down.offset));
+    if (!raf) raf = requestAnimationFrame(() => { raf = 0; if (pendingX != null && dragging) setX(pendingX); });
+    setHover(idxAt(r.left + pendingX + w / 2));
   });
   const finish = (e, cancel) => {
-    if (!down) return;
-    const idx = cancel ? activeIdx() : (dragging ? idxAt(e.clientX) : down.idx);
+    if (!down || (e && e.pointerId !== down.id)) return;
+    const { w } = geom();
+    const r = bar.getBoundingClientRect();
+    const x = pendingX != null ? pendingX : lensX;
+    const idx = cancel ? activeIdx() : dragging ? idxAt(r.left + x + w / 2) : down.idx;
+    cancelAnimationFrame(raf); raf = 0; pendingX = null;
+    if (dragging) setX(x);
+    down = null; dragging = false;
+    setHover(-1);
     bar.classList.remove('dragging', 'pressed');
-    tabs().forEach((t) => t.classList.remove('hover'));
-    down = null; dragging = false; hoverIdx = -1;
     switchTab(TABS[idx].id);
   };
   bar.addEventListener('pointerup', (e) => finish(e, false));
   bar.addEventListener('pointercancel', (e) => finish(e, true));
+  bar.addEventListener('lostpointercapture', (e) => { if (down) finish(e, !dragging); });
   bar.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') { const t = e.target.closest('.tab'); if (t) { e.preventDefault(); switchTab(t.dataset.tab); } }
   });
@@ -358,26 +380,33 @@ function buildTabbar() {
   // Lichtbrechung nur dort, wo der Browser SVG-Filter als backdrop-filter kann (Chromium)
   if (window.chrome && CSS.supports('backdrop-filter', 'url(#lg-refract)')) document.documentElement.classList.add('refract');
 
+  let placed = false;
   syncTabbar = () => {
     const ai = activeIdx();
     tabs().forEach((t, i) => { t.classList.toggle('active', i === ai); t.setAttribute('aria-current', i === ai ? 'page' : 'false'); });
-    placeLens(ai);
+    if (!dragging) placeLens(ai, placed);
+    placed = true;
     const open = myOpenTasks().filter((t) => t.due && t.due <= today()).length;
     const tb = tabs()[1];
     let b = $('.badge', tb);
     if (open) { if (!b) { b = document.createElement('i'); b.className = 'badge'; tb.appendChild(b); } b.textContent = open; } else b?.remove();
-    $('#fab').hidden = state.tab === 'house';
   };
 }
 let syncTabbar = () => {};
 
+let tabRender = 0;
 function switchTab(id) {
   if (state.tab !== id) {
     haptic(6);
     state.tab = id;
     LS.set('tab', id);
-    window.scrollTo({ top: 0 });
-    renderNow(true);
+    // Erst die Linse losgleiten lassen, dann (zwei Frames später) den neuen Inhalt aufbauen –
+    // so ruckelt die Animation nicht, während die Seite neu gezeichnet wird.
+    syncTabbar();
+    cancelAnimationFrame(tabRender);
+    tabRender = requestAnimationFrame(() => {
+      tabRender = requestAnimationFrame(() => { window.scrollTo({ top: 0 }); renderNow(true); });
+    });
   } else {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     syncTabbar();
@@ -432,10 +461,14 @@ function renderNow(animate) {
   sheets.forEach((s) => s.refresh?.(s));
 }
 
+const ADD_LABEL = { home: 'Neu erstellen', tasks: 'Neue Aufgabe', trash: 'Neue Tonne', board: 'Neuer Beitrag' };
 const header = (eyebrow, title) => `
   <header class="top">
-    <div><p class="eyebrow">${eyebrow}</p><h1>${title}</h1></div>
-    <button class="me-btn" data-act="profile" aria-label="Mein Profil">${avatar(state.me, 42)}</button>
+    <div class="top-text"><p class="eyebrow">${eyebrow}</p><h1>${title}</h1></div>
+    <div class="top-actions">
+      ${ADD_LABEL[state.tab] ? `<button class="add-btn" data-act="add" aria-label="${ADD_LABEL[state.tab]}">${I.plus}</button>` : ''}
+      <button class="me-btn" data-act="profile" aria-label="Mein Profil">${avatar(state.me, 42)}</button>
+    </div>
   </header>`;
 
 function localBanner() {
@@ -2095,6 +2128,7 @@ const ACTIONS = {
   tab: (d) => switchTab(d.v),
   noop: () => {},
   profile: () => memberSheet(state.me),
+  add: () => onFab(),
   'goto-tasks': (d) => { state.taskView = 'open'; state.taskPerson = d.v; switchTab('tasks'); },
   'goto-person': (d) => { state.taskView = 'open'; state.taskPerson = d.id === state.me ? 'mine' : d.id; switchTab('tasks'); },
   'goto-feed': (d) => { state.feedFilter = d.v; switchTab('board'); },
@@ -2197,7 +2231,7 @@ function applyTheme() {
   else document.documentElement.dataset.theme = t;
 }
 
-const LOGO = `<div class="logo">${svg('<path d="M3 11 12 4l9 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M9.5 14.5h5M9.5 17.5h3"/>', 1.8)}</div>`;
+const LOGO = `<div class="logo"><img src="icons/icon.svg?v=2" alt=""></div>`;
 
 function showWelcome() {
   $('#dock').hidden = true;
