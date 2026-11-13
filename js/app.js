@@ -416,10 +416,12 @@ function settleViewport() {
   settleTimer = setTimeout(() => {
     if (typing()) return;
     const y = scrollLocked ? lockY : window.scrollY;
-    // Kurz „anstupsen“, damit Safari die festen Elemente neu an den Bildschirm hängt
+    // Kurz „anstupsen“, damit Safari die Höhe des sichtbaren Bereichs neu berechnet
+    const st = document.documentElement.style;
+    st.minHeight = 'calc(100% + 2px)';
     window.scrollTo(0, y + 1);
-    window.scrollTo(0, y);
-  }, 60);
+    requestAnimationFrame(() => { st.minHeight = ''; window.scrollTo(0, y); });
+  }, 80);
 }
 document.addEventListener('focusout', () => settleViewport());
 window.visualViewport?.addEventListener('resize', () => { if (!typing()) settleViewport(); });
