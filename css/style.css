@@ -1359,3 +1359,20 @@ img.blur { filter: blur(14px) saturate(1.2); transform: scale(1.08); }
 select option, select optgroup { background-color: #ffffff; color: #1c1c1e; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) select option, :root:not([data-theme="light"]) select optgroup { background-color: #1e1f26; color: #f2f2f7; } }
 :root[data-theme="dark"] select option, :root[data-theme="dark"] select optgroup { background-color: #1e1f26; color: #f2f2f7; }
+
+/* Offenes Sheet: Hintergrund scrollt nicht mit */
+html.sheet-open, html.sheet-open body { overscroll-behavior: none; }
+.sheet-backdrop { touch-action: none; }
+.sheet { overscroll-behavior: contain; }
+.sheet-head, .grabber { touch-action: none; }
+
+/* Gedrückt halten markiert keinen Text (wie in einer App) – Eingabefelder bleiben normal */
+.dm-sheet, .dm-sheet *, .sheet-head, .tabbar, .dock, .list-item, .chip, .btn, .seg, .kpi, .person, .dm-actions, .menu-list {
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+@media (hover: none) {
+  body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+}
+input, textarea, select, [contenteditable="true"], .dm-sheet input, .dm-sheet textarea {
+  -webkit-user-select: text; user-select: text; -webkit-touch-callout: default;
+}

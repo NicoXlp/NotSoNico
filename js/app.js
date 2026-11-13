@@ -381,6 +381,25 @@ function toast(msg, ms = 2600) {
 }
 
 const sheets = [];
+/* Hintergrund festhalten, solange ein Sheet offen ist (auch iOS: body fixieren statt nur overflow) */
+let scrollLockY = null;
+function lockScroll() {
+  if (scrollLockY != null) return;
+  scrollLockY = window.scrollY;
+  const b = document.body.style;
+  b.position = 'fixed'; b.top = `-${scrollLockY}px`; b.left = '0'; b.right = '0'; b.width = '100%';
+  document.documentElement.classList.add('sheet-open');
+}
+function unlockScroll() {
+  if (scrollLockY == null) return;
+  const y = scrollLockY;
+  scrollLockY = null;
+  const b = document.body.style;
+  b.position = b.top = b.left = b.right = b.width = '';
+  document.documentElement.classList.remove('sheet-open');
+  window.scrollTo(0, y);
+}
+
 function openSheet({ title, html, onMount, refresh, onClose }) {
   const wrap = document.createElement('div');
   wrap.className = 'sheet-wrap';
@@ -404,6 +423,7 @@ function openSheet({ title, html, onMount, refresh, onClose }) {
     wrap.classList.add('closing');
     setTimeout(() => wrap.remove(), 380);
     sheets.splice(sheets.indexOf(api), 1);
+    if (!sheets.length) setTimeout(() => { if (!sheets.length) unlockScroll(); }, 0);
   }
   wrap.addEventListener('click', (e) => {
     if (e.target.classList.contains('sheet-backdrop') || e.target.closest('[data-close]')) close();
@@ -425,6 +445,7 @@ function openSheet({ title, html, onMount, refresh, onClose }) {
     el.addEventListener('pointercancel', end);
   });
   sheets.push(api);
+  lockScroll();
   requestAnimationFrame(() => requestAnimationFrame(() => wrap.classList.add('open')));
   onMount?.(api);
   settleSegs(wrap);
