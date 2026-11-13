@@ -1516,3 +1516,23 @@ html.sheet-open, html.sheet-open body { overflow: hidden; overscroll-behavior: n
 .news-badge.old { background: var(--fill); color: var(--text-2); }
 @media (min-width: 900px) { .news-scroll { max-height: 250px; } }
 @media (max-height: 540px) and (max-width: 600px) { .news-scroll { max-height: 200px; } }
+
+/* ─── Wünsche & Anregungen ────────────────────────────────────────────────── */
+.fb-card { padding: 14px; }
+.fb-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.fb-actions .btn { width: 100%; justify-content: center; }
+.fb-card .fb-list { margin: 10px -6px 0; }
+.fb-item { align-items: flex-start; }
+.fb-ico { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; flex: none; font-size: 18px; background: var(--fill); margin-top: 2px; }
+.fb-ico.bug { background: color-mix(in srgb, var(--danger) 14%, transparent); }
+.fb-ico.wish { background: color-mix(in srgb, var(--warning) 18%, transparent); }
+.fb-item .sub .pill.blue { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.fb-item .sub .pill.green { background: color-mix(in srgb, var(--success) 18%, transparent); color: var(--success); }
+.fb-item.done .title { text-decoration: line-through; opacity: .6; }
+.fb-text { font-size: 14px; color: var(--text-2); margin-top: 4px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.3; }
+.fb-vote { flex: none; display: grid; justify-items: center; gap: 0; min-width: 40px; padding: 4px 6px; border-radius: 12px; font-size: 17px; line-height: 1.1; color: var(--text-2); }
+.fb-vote b { font-size: 12px; font-weight: 700; min-height: 13px; }
+.fb-vote.on { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+.fb-vote:active { transform: scale(.9); }
+.fb-more { margin: 8px 4px 0; font-size: 14px; font-weight: 650; color: var(--accent); }
+@media (max-width: 340px) { .fb-actions { grid-template-columns: 1fr; } }

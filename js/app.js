@@ -160,7 +160,7 @@ const state = {
   ready: false,
   hid: null,
   house: null,
-  members: [], tasks: [], feed: [], trash: [], messages: [],
+  members: [], tasks: [], feed: [], trash: [], messages: [], feedback: [],
   loaded: new Set(),
   synced: new Set(), // Sammlungen, die wirklich vom Server (nicht nur aus dem Zwischenspeicher) kamen
   me: null,
@@ -1513,6 +1513,8 @@ const VIEWS = {
         </button>`).join('')}</div>`
         : `<div class="card empty"><div class="big">📅</div>Nichts geplant. <button class="link" style="color:var(--accent);font-weight:650" data-act="compose" data-v="event">Ereignis erstellen</button></div>`}
 
+      ${fbTile()}
+
       <h2 class="section-title">Social Hub <button class="link" data-act="tab" data-v="board">Alle</button></h2>
       ${posts.length ? posts.map((p) => postCard(p)).join('') : `<button class="card compose-prompt" data-act="compose" data-v="post">${avatar(state.me, 36)}<span class="fake-input">Schreib etwas an alle …</span></button>`}
       </div></div>`;
@@ -2146,6 +2148,125 @@ function dmListSheet() {
     refresh: (api) => { $('#dml', api.el).innerHTML = html(); },
     onMount: (api) => {
       api.body.addEventListener('click', (e) => { const b = e.target.closest('[data-dm]'); if (b) chatSheet(b.dataset.dm); });
+    },
+  });
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Wünsche & Anregungen (Bugs melden, neue Funktionen wünschen)
+   Eintrag: { kind: 'bug'|'wish', title, text, author, createdAt, votes: [ids], status: 'open'|'doing'|'done' }
+   ═══════════════════════════════════════════════════════════════════════════ */
+const FB_KIND = { bug: ['🐞', 'Bug'], wish: ['💡', 'Wunsch'] };
+const FB_STATUS = { open: ['Offen', ''], doing: ['In Arbeit', 'blue'], done: ['Erledigt', 'green'] };
+const fbSorted = () => [...state.feedback].sort((a, b) =>
+  (a.status === 'done') - (b.status === 'done') || (b.votes?.length || 0) - (a.votes?.length || 0) || (b.createdAt || 0) - (a.createdAt || 0));
+function fbRow(f, compact = false) {
+  const [ico, label] = FB_KIND[f.kind] || FB_KIND.wish;
+  const [stTxt, stCls] = FB_STATUS[f.status] || FB_STATUS.open;
+  const voted = (f.votes || []).includes(state.me);
+  return `<div class="list-item fb-item ${f.status === 'done' ? 'done' : ''}">
+    <span class="fb-ico ${f.kind}" title="${label}">${ico}</span>
+    <button class="main" data-act="fb-open" data-id="${f.id}" style="text-align:left">
+      <div class="title">${esc(f.title)}</div>
+      <div class="sub"><span class="pill ${stCls}">${stTxt}</span><span>${esc(nameOf(f.author))} · ${relTime(f.createdAt)}</span></div>
+      ${!compact && f.text ? `<div class="fb-text">${esc(f.text)}</div>` : ''}
+    </button>
+    <button class="fb-vote ${voted ? 'on' : ''}" data-act="fb-vote" data-id="${f.id}" aria-label="Ich auch (${(f.votes || []).length})" title="Ich auch">👍<b>${(f.votes || []).length || ''}</b></button>
+  </div>`;
+}
+function fbTile() {
+  const open = state.feedback.filter((f) => f.status !== 'done');
+  const top = fbSorted().filter((f) => f.status !== 'done').slice(0, 3);
+  return `<h2 class="section-title">Wünsche & Anregungen <button class="link" data-act="fb-list">Alle${state.feedback.length ? ` (${state.feedback.length})` : ''}</button></h2>
+    <div class="card fb-card">
+      <p class="small muted" style="margin:0 2px 10px">Etwas funktioniert nicht oder dir fehlt eine Funktion? Sag Bescheid – alle können mit 👍 zustimmen.</p>
+      <div class="fb-actions">
+        <button class="btn sm" data-act="fb-new" data-v="bug">🐞 Bug melden</button>
+        <button class="btn sm" data-act="fb-new" data-v="wish">💡 Wunsch äußern</button>
+      </div>
+      ${top.length ? `<div class="list tight fb-list">${top.map((f) => fbRow(f, true)).join('')}</div>` : ''}
+      ${open.length > 3 ? `<button class="link fb-more" data-act="fb-list">+ ${open.length - 3} weitere offene</button>` : ''}
+    </div>`;
+}
+function fbVote(id) {
+  const f = state.feedback.find((x) => x.id === id);
+  if (!f) return;
+  const on = (f.votes || []).includes(state.me);
+  mutate('feedback', id, (x) => ({ ...x, votes: on ? (x.votes || []).filter((v) => v !== state.me) : [...new Set([...(x.votes || []), state.me])] }));
+  haptic(8);
+}
+function fbSheet(kind = 'wish', id = null) {
+  const f = id ? state.feedback.find((x) => x.id === id) : null;
+  let k = f?.kind || kind;
+  openSheet({
+    title: f ? 'Eintrag bearbeiten' : 'Wünsche & Anregungen',
+    html: `<form id="fbf">
+      ${segmented([['bug', '🐞 Bug melden'], ['wish', '💡 Wunsch']], k, 'noop')}
+      <div class="field"><label for="fb-title" id="fb-tl">${k === 'bug' ? 'Was funktioniert nicht?' : 'Was wünschst du dir?'}</label>
+        <input id="fb-title" required maxlength="120" value="${esc(f?.title || '')}" placeholder="${k === 'bug' ? 'z. B. Sprachnachricht spielt nicht ab' : 'z. B. Einkaufsliste für alle'}" autofocus></div>
+      <div class="field"><label for="fb-text">Details (optional)</label>
+        <textarea id="fb-text" maxlength="2000" placeholder="${k === 'bug' ? 'Wo ist es passiert? Was hast du gemacht? Welches Gerät?' : 'Wie stellst du dir das vor?'}">${esc(f?.text || '')}</textarea></div>
+      ${f ? `<div class="field"><span class="label">Status</span>${segmented(Object.entries(FB_STATUS).map(([v, [l]]) => [v, l]), f.status || 'open', 'noop')}</div>` : ''}
+      <div class="sheet-actions">
+        ${f && f.author === state.me ? '<button type="button" class="btn danger" id="fb-del">Löschen</button>' : ''}
+        <button class="btn primary" type="submit">${f ? 'Speichern' : 'Absenden'}</button>
+      </div>
+    </form>`,
+    onMount: (api) => {
+      const form = $('#fbf', api.el);
+      const segs = $$('.seg', form);
+      let status = f?.status || 'open';
+      segs[0].addEventListener('click', (e) => {
+        const b = e.target.closest('[data-v]'); if (!b) return;
+        k = b.dataset.v;
+        $('#fb-tl', form).textContent = k === 'bug' ? 'Was funktioniert nicht?' : 'Was wünschst du dir?';
+        $('#fb-title', form).placeholder = k === 'bug' ? 'z. B. Sprachnachricht spielt nicht ab' : 'z. B. Einkaufsliste für alle';
+        $('#fb-text', form).placeholder = k === 'bug' ? 'Wo ist es passiert? Was hast du gemacht? Welches Gerät?' : 'Wie stellst du dir das vor?';
+      });
+      segs[1]?.addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (b) status = b.dataset.v; });
+      form.onsubmit = (e) => {
+        e.preventDefault();
+        const title = $('#fb-title', form).value.trim();
+        const text = $('#fb-text', form).value.trim();
+        if (!title) return;
+        if (f) mutate('feedback', f.id, (x) => ({ ...x, kind: k, title, text, status, ...(status !== x.status ? { statusBy: state.me, statusAt: Date.now() } : {}) }));
+        else {
+          addDoc('feedback', { kind: k, title, text, author: state.me, createdAt: Date.now(), votes: [state.me], status: 'open' });
+          emit('feedback', { title: `${k === 'bug' ? '🐞 Bug gemeldet' : '💡 Neuer Wunsch'} von ${myName()}`, body: snippet(title, 140), tab: 'home' });
+        }
+        haptic(10);
+        toast(f ? 'Gespeichert' : k === 'bug' ? '🐞 Danke fürs Melden!' : '💡 Danke für deinen Wunsch!');
+        api.close();
+      };
+      $('#fb-del', form)?.addEventListener('click', async () => {
+        if (await confirmSheet(`„${f.title}“ löschen?`)) { removeDoc('feedback', f.id); api.close(); }
+      });
+    },
+  });
+}
+function fbListSheet() {
+  let filter = 'all';
+  const html = () => {
+    const list = fbSorted().filter((f) => filter === 'all' || f.kind === filter);
+    return `${segmented([['all', 'Alle'], ['bug', '🐞 Bugs'], ['wish', '💡 Wünsche']], filter, 'noop')}
+      <div class="row" style="gap:8px;margin:12px 0">
+        <button class="btn sm block" data-act="fb-new" data-v="bug">🐞 Bug melden</button>
+        <button class="btn sm block" data-act="fb-new" data-v="wish">💡 Wunsch äußern</button>
+      </div>
+      ${list.length ? `<div class="list card tight fb-list">${list.map((f) => fbRow(f)).join('')}</div>`
+        : '<div class="empty"><div class="big">💬</div>Noch keine Einträge – mach den Anfang!</div>'}
+      <p class="small muted center" style="margin:12px 6px 0">Tippe auf einen Eintrag, um Details oder den Status zu ändern. 👍 heißt „Ich auch“.</p>`;
+  };
+  openSheet({
+    title: 'Wünsche & Anregungen',
+    html: `<div id="fbl">${html()}</div>`,
+    refresh: (api) => { $('#fbl', api.el).innerHTML = html(); settleSegs(api.el); },
+    onMount: (api) => {
+      api.body.addEventListener('click', (e) => {
+        const b = e.target.closest('.seg [data-v]');
+        if (b && b.closest('#fbl')) { filter = b.dataset.v; setTimeout(() => api.refresh(api), 200); }
+      });
     },
   });
 }
@@ -3303,6 +3424,10 @@ const ACTIONS = {
   'goto-tasks': (d) => { state.taskView = 'open'; state.taskPerson = d.v; switchTab('tasks'); },
   'goto-person': (d) => { state.taskView = 'open'; state.taskPerson = d.id === state.me ? 'mine' : d.id; switchTab('tasks'); },
   'goto-feed': (d) => { state.feedFilter = d.v; switchTab('board'); },
+  'fb-new': (d) => fbSheet(d.v),
+  'fb-open': (d) => fbSheet(null, d.id),
+  'fb-vote': (d) => fbVote(d.id),
+  'fb-list': () => fbListSheet(),
   'task-toggle': (d) => toggleTask(d.id),
   'task-edit': (d) => taskSheet(d.id),
   'task-new': () => taskSheet(),
