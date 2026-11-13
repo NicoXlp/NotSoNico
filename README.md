@@ -6,7 +6,7 @@ Die Web-App für eure Hausgemeinschaft – im **Liquid-Glass-Design**, für iPho
 - 🗑️ **Müllabfuhr** – Abholplan mit Kalender, „Wer ist dran?“-Rotation, **Bestätigungsfeld „Rausgestellt von …“** für alle sichtbar
 - 📅 **Abfallkalender hochladen** – jede:r kann den .ics-Kalender der Stadt hochladen und festlegen, für wen er gilt (ganzes Haus, nur ich, bestimmte Personen)
 - 🔔 **Push-Erinnerungen** – z. B. am Vorabend um 18 Uhr: „Gelber Sack rausstellen – du bist dran!“, mit Nachfassen, falls noch niemand bestätigt hat, und Button „✓ Rausgestellt“ direkt in der Mitteilung
-- 📌 **Pinnwand** – Beiträge mit **Fotos & Videos**, **Sprachnachrichten**, Umfragen und Ereignisse mit Zu-/Absage; Likes, Emoji-Reaktionen und Kommentare
+- 📌 **Pinnwand** – Beiträge mit **Fotos & Videos**, **@Markierungen**, **Sprachnachrichten**, Umfragen und Ereignisse mit Zu-/Absage; Likes, Emoji-Reaktionen und Kommentare
 - 🌗 Hell/Dunkel, offline-fähig, installierbar als App (PWA)
 
 ---
@@ -71,6 +71,18 @@ Einstellungen pro Gerät:
 
 Ohne Push-Einrichtung erinnert die App, solange sie geöffnet ist. Zusätzlich gibt es **„In meinen Kalender exportieren“** (.ics mit Erinnerung).
 
+## 5. Sofort-Push (Cloudflare Workers, kostenlos)
+
+Ohne diesen Schritt verschickt die GitHub Action Mitteilungen alle 5 Minuten. Mit dem kleinen Cloudflare Worker (`push-worker/`) kommen sie in Sekunden an.
+
+1. Kostenloses Konto auf <https://dash.cloudflare.com> anlegen und einmal **Workers & Pages** öffnen (dabei die `workers.dev`-Subdomain festlegen).
+2. **Account-ID** kopieren (Workers & Pages → rechte Spalte).
+3. **My Profile → API Tokens → Create Token → Vorlage „Edit Cloudflare Workers“** → Token erstellen und kopieren.
+4. GitHub → Settings → Secrets and variables → Actions:
+   - Secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (der `VAPID_PRIVATE_KEY` ist schon da)
+   - Variable: `WORKER_ENABLED` = `true`
+5. Workflow **„Sofort-Push veröffentlichen“** starten. Die Worker-Adresse aus dem Protokoll in `js/config.js` bei `PUSH_WORKER_URL` eintragen.
+
 ## Aufbau
 
 | Datei | Inhalt |
@@ -82,7 +94,8 @@ Ohne Push-Einrichtung erinnert die App, solange sie geöffnet ist. Zusätzlich g
 | `js/trash-logic.js` | Abholtermine, Rotation, Erinnerungslogik (App **und** Server) |
 | `js/ics.js` | iCalendar Import/Export |
 | `js/media.js` | Fotos verkleinern, Videos/Fotos stückweise speichern & laden |
-| `scripts/send-reminders.mjs` | Push-Versand (GitHub Action) |
+| `scripts/send-reminders.mjs` | Push-Versand alle 5 Min. & Müll-Erinnerungen (GitHub Action) |
+| `push-worker/` | Sofort-Push (Cloudflare Worker, Web Push mit WebCrypto) |
 | `sw.js` | Offline-Cache, Push-Empfang, „✓ Rausgestellt“ aus der Mitteilung |
 
 Sprachnachrichten (ca. 32 kbit/s, max. ~2–3 Minuten), Fotos (automatisch auf max. 1600 px verkleinert) und Videos (bis 20 MB, in ~1-MB-Stücken) werden direkt in Firestore gespeichert – Firebase Storage (kostenpflichtiger Tarif) ist nicht nötig. Der kostenlose Firestore-Tarif bietet 1 GB Speicher; für viele lange Videos reicht das irgendwann nicht mehr – also lieber kurze Clips teilen.

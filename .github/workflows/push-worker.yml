@@ -1,0 +1,27 @@
+name: Sofort-Push veröffentlichen (Cloudflare)
+
+on:
+  push:
+    branches: [main]
+    paths: ['push-worker/**', 'js/trash-logic.js']
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    # Läuft erst, wenn unter Settings → Secrets and variables → Actions → Variables
+    # die Variable WORKER_ENABLED = true angelegt ist.
+    if: ${{ vars.WORKER_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: push-worker
+          command: deploy
+          secrets: |
+            VAPID_PRIVATE_KEY
+        env:
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}

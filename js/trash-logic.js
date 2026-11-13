@@ -59,6 +59,7 @@ export const EVENT_TYPES = [
   ['post_new', '📌 Neue Beiträge auf der Pinnwand'],
   ['social', '❤️ Likes, Kommentare & Reaktionen auf meine Beiträge'],
   ['bin_done', '🗑️ Tonne wurde rausgestellt'],
+  ['mention', '🏷️ Wenn mich jemand markiert'],
 ];
 
 /** Welche Neuigkeiten gehen an dieses Mitglied? (nicht an die auslösende Person, nur an Empfänger, abgeschaltete Arten weg) */
