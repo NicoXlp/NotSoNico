@@ -1639,3 +1639,7 @@ html.splashing #app, html.splashing .dock, html.splashing .backdrop, html.splash
 .st-main { display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; min-width: 0; }
 .st-when { font-size: 15px; font-weight: 600; color: var(--text-2); letter-spacing: 0; }
 .st-when.soon { color: var(--accent); }
+
+/* Navigationsleiste bleibt immer an ihrem Platz: kein Nachfedern der ganzen Seite am Anfang/Ende */
+html, body { overscroll-behavior-y: none; }
+.dock { will-change: transform; }

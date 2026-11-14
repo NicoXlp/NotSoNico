@@ -440,9 +440,15 @@ function vvOverflow() {
   if (!vv) return 0;
   return Math.round(vv.offsetTop + vv.height - window.innerHeight);
 }
+let touching = false;
+document.addEventListener('touchstart', () => { touching = true; }, { passive: true, capture: true });
+document.addEventListener('touchend', () => { touching = false; }, { passive: true, capture: true });
+document.addEventListener('touchcancel', () => { touching = false; }, { passive: true, capture: true });
 function fixIosGap() {
   if (typing()) return;
-  const vvGap = vvOverflow();
+  // Verschobene Ansicht nur direkt nach der Tastatur ausgleichen – NICHT beim normalen
+  // Scrollen/Nachfedern am Seitenende (sonst rutscht die Navigationsleiste mit).
+  const vvGap = kbArmed && !touching ? vvOverflow() : 0;
   if (vvGap > 2) { setGap(vvGap); return; }
   // Das App-Fenster selbst ist kleiner geworden (iPhone): dort kann die App nichts hinmalen –
   // also NICHT verschieben, sondern das iPhone dazu bringen, das Fenster wieder groß zu machen.
