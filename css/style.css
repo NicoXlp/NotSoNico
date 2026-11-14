@@ -1626,3 +1626,7 @@ html.splashing #app, html.splashing .dock, html.splashing .backdrop, html.splash
 @keyframes spCardIn { from { opacity: 0; transform: translateY(18px) scale(.9); } }
 .sp-old, .sp-today, .sp-check, .sp-rings i, .sp-lines i { will-change: transform, opacity; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
 .splash.out .sp-card { transition: none; }
+
+/* Kommentar-Vorschau unter Beiträgen: mittig */
+.last-comment { justify-content: center; align-items: center; text-align: center; }
+.last-comment > span { min-width: 0; }
