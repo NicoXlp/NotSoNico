@@ -1634,3 +1634,8 @@ html.splashing #app, html.splashing .dock, html.splashing .backdrop, html.splash
 /* Name + „Du“ exakt auf einer Linie, mittig zur Schrift */
 .title.name-row { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 6px; }
 .you-pill { padding: 1px 7px; font-size: 11px; line-height: 1.35; flex: none; }
+
+/* Abholtermin klein neben „Nächste Abholung“ statt groß in der Kachel */
+.st-main { display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; min-width: 0; }
+.st-when { font-size: 15px; font-weight: 600; color: var(--text-2); letter-spacing: 0; }
+.st-when.soon { color: var(--accent); }

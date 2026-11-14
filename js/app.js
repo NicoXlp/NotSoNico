@@ -1681,12 +1681,11 @@ const VIEWS = {
         <button class="kpi card ${overdue.length ? 'red' : ''}" data-act="goto-tasks" data-v="all"><div class="n">${overdue.length}</div><div class="l">Überfällig</div></button>
       </div>
       <div class="home-grid"><div>
-      <h2 class="section-title">Nächste Abholung <button class="link" data-act="tab" data-v="trash">Plan</button></h2>
+      <h2 class="section-title"><span class="st-main">Nächste Abholung${nextDate ? `<span class="st-when ${soon ? 'soon' : ''}">${esc(fmtDay(nextDate))}</span>` : ''}</span> <button class="link" data-act="tab" data-v="trash">Plan</button></h2>
       ${nextGroup.length ? `<div class="card hero-trash ${soon ? 'soon' : ''}">
         ${nextGroup.map((p, i) => `<div class="next-pickup" ${i ? 'style="margin-top:16px"' : ''}>
           ${binIcon(p.bin, true)}
           <div style="flex:1;min-width:0">
-            ${i === 0 ? `<div class="when">${esc(fmtDay(p.date))}</div>` : ''}
             <div style="font-weight:700">${esc(p.bin.name)}</div>
             <div class="small muted bin-who">${binWhoHtml(p)}${soon && !p.done ? ' · am Vorabend rausstellen' : ''}</div>
           </div>
