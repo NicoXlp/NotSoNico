@@ -1864,7 +1864,7 @@ const VIEWS = {
         return `<div class="list-item member-row">
           <button class="main" data-act="member-edit" data-id="${p.id}">
             ${avatar(p.id, 40)}
-            <span class="txt"><div class="title">${esc(dn(p.id))}${nickOf(p.id) ? ` <span class="floor-tag">${esc(p.name)}</span>` : ''}${p.id === state.me ? ' <span class="pill blue">Du</span>' : ''}</div>
+            <span class="txt"><div class="title name-row"><span>${esc(dn(p.id))}</span>${nickOf(p.id) ? `<span class="floor-tag">${esc(p.name)}</span>` : ''}${p.id === state.me ? '<span class="pill blue you-pill">Du</span>' : ''}</div>
             ${presenceText(p.id) ? `<div class="sub">${presenceText(p.id)}</div>` : ''}<div class="sub">${plural(open, 'offene Aufgabe', 'offene Aufgaben')} · ${done} erledigt</div></span>
           </button>
           ${p.id !== state.me ? `<button class="icon-btn" data-act="dm-open" data-id="${p.id}" aria-label="Nachricht an ${esc(dn(p.id))}">${I.dm}${dmUnread(p.id) ? `<b class="badge">${dmUnread(p.id)}</b>` : ''}</button>` : ''}
