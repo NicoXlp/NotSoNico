@@ -1667,7 +1667,8 @@ const VIEWS = {
     const soon = nextDate && daysBetween(today(), nextDate) <= 1;
     const events = upcomingEvents().slice(0, 3);
     const polls = openPollsForMe().slice(0, 2);
-    const posts = feedSorted().filter((p) => p.type === 'post' || p.type === 'voice').slice(0, 2);
+    // Startseite: immer nur der neueste Beitrag (unabhängig vom Anheften)
+    const posts = state.feed.filter((p) => p.type === 'post' || p.type === 'voice').sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 1);
     const people = membersSorted();
     const maxLoad = Math.max(1, ...people.map((p) => openTasks().filter((t) => t.assignee === p.id).length));
 
