@@ -1630,3 +1630,7 @@ html.splashing #app, html.splashing .dock, html.splashing .backdrop, html.splash
 /* Kommentar-Vorschau unter Beiträgen: mittig */
 .last-comment { justify-content: center; align-items: center; text-align: center; }
 .last-comment > span { min-width: 0; }
+
+/* Name + „Du“ exakt auf einer Linie, mittig zur Schrift */
+.title.name-row { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 6px; }
+.you-pill { padding: 1px 7px; font-size: 11px; line-height: 1.35; flex: none; }
