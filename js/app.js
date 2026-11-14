@@ -1548,7 +1548,7 @@ const NEWS = [
     date: '2026-11-13',
     label: '🛠️ Bug-Fixes',
     items: [
-      { icon: '🫧', title: 'Fenster als Blase', text: 'Beiträge, Aufgaben, Kommentare & Co. öffnen sich jetzt als schwebende Blase – wie die Privatchats.' },
+      { icon: '🫧', title: 'Fenster als Blase', text: 'Beiträge, Aufgaben, Kommentare & Co. öffnen sich jetzt als schwebende Blase.' },
       { icon: '📱', title: 'Kein schwarzer Balken', text: 'Nach dem Tippen oder Markieren bleibt unten am iPhone kein schwarzer Streifen mehr stehen.' },
       { icon: '🖥️', title: 'Auf allen Geräten', text: 'Gleiches Aussehen auf Handy, Tablet, PC und Faltbildschirmen – mit sanftem Ein- und Ausblenden.' },
     ],
